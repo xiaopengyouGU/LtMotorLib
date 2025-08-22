@@ -15,5 +15,5 @@ ps = [0 10]';
 pe = [10 0]';
 r = 10;
 dir = 1;% counter-clockwise
-[path,desired_path] = interp.process(ps,pe,r,1);
+[path,desired_path] = interp.process(ps,pe,r,dir);
 interp.plot();

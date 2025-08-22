@@ -22,9 +22,9 @@ classdef lt_foc < handle
             %check angle_el
             angle_el = lt_normalize_angle(angle_el);
             center = foc.max_val/2;
-            max = foc.max_val/2;
-            fq = lt_constrain(fq,-max,max);
-            fd = lt_constrain(fd,-max,max);
+            max_val = foc.max_val/2;
+            fq = lt_constrain(fq,-max_val,max_val);
+            fd = lt_constrain(fd,-max_val,max_val);
             ca = cos(angle_el);
             sa = sin(angle_el);
 
