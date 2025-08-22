@@ -84,9 +84,8 @@
 
 /* bldc motor definition parameter */
 #define BLDC_OPEN_SPEED				100			/* BLDC motor open output angle  speed */
-//#define BLDC_PERIOD					10000	/* BLDC measure period, 10ms, unit: us */
-#define BLDC_PERIOD					2000
-#define BLDC_OUTPUT_PERIOD			100			/* 100ms, unit: us, 10kHz */
+#define BLDC_PERIOD					100			/* BLDC measure period, 100us */
+#define BLDC_OUTPUT_PERIOD			100			/* 100us,10kHz */
 #define BLDC_CURRENT_LIMIT			3.3/2		/* max current, unit: A */
 	
 

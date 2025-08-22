@@ -50,6 +50,25 @@ rt_err_t lt_sensor_calibrate(lt_sensor_t sensor)
 	return sensor->ops->calibrate(sensor);
 }
 
+rt_err_t lt_sensor_control(lt_sensor_t sensor, int cmd, void* arg)
+{
+	RT_ASSERT(sensor != RT_NULL);
+	RT_ASSERT(sensor->ops != RT_NULL);
+	RT_ASSERT(sensor->ops->control != RT_NULL);
+	
+	switch (cmd)
+	{
+		case SENSOR_CTRL_ASYNC_READ:
+		case SENSOR_CTRL_SYNC_READ:
+		{
+			sensor->ops->control(sensor,cmd,arg);
+			break;
+		}
+		default:break;
+	}
+	
+}
+
 rt_err_t lt_sensor_delete(lt_sensor_t sensor)
 {
 	RT_ASSERT(sensor != RT_NULL);

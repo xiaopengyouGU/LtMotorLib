@@ -99,4 +99,5 @@ struct lt_sensor_ops _sensor_encoder_ops = {	_sensor_encoder_create,
 												_sensor_encoder_get_angle,
 												_sensor_encoder_get_velocity,
 												_sensor_encoder_calibrate,
+												RT_NULL,
 };

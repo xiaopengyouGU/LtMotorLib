@@ -99,7 +99,7 @@ rt_err_t lt_current_get_ab(lt_current_t current, float angle, float * _I_alpha, 
 	float Ia, Ib, Ic;
 	
 	_current_get(current,&Ia,&Ib,&Ic);
-	_clark_trans(Ia,Ib,Ic,_I_alpha,_I_beta);
+//	_clark_trans(Ia,Ib,Ic,_I_alpha,_I_beta);
 	return RT_EOK;
 }
 
@@ -114,9 +114,9 @@ rt_err_t lt_current_get_dq(lt_current_t current, float angle,float dt, float * _
 	
 	_current_get(current,&Ia,&Ib,&Ic);
 	/* Clark transform */
-	_clark_trans(Ia,Ib,Ic,&I_alpha,&I_beta);
+//	_clark_trans(Ia,Ib,Ic,&I_alpha,&I_beta);
 	/* Park transform ,check angle */
-	_park_trans(I_alpha,I_beta,angle,&Id,&Iq);
+//	_park_trans(I_alpha,I_beta,angle,&Id,&Iq);
 	/* low pass filter process */
 	if(dt >= 0)							/* sample time, unit: s */
 	{
@@ -140,12 +140,12 @@ rt_err_t lt_current_get_info(lt_current_t current, float angle, struct lt_curren
 	float Ia, Ib, Ic;
 	float I_alpha, I_beta;
 	float Id,Iq;
-	angle = _normalize_angle(angle);
-	_current_get(current,&Ia,&Ib,&Ic);
-	/* Clark transform */
-	_clark_trans(Ia,Ib,Ic,&I_alpha,&I_beta);
-	/* Park transform ,check angle */
-	_park_trans(I_alpha,I_beta,angle,&Id,&Iq);
+//	angle = _normalize_angle(angle);
+//	_current_get(current,&Ia,&Ib,&Ic);
+//	/* Clark transform */
+//	_clark_trans(Ia,Ib,Ic,&I_alpha,&I_beta);
+//	/* Park transform ,check angle */
+//	_park_trans(I_alpha,I_beta,angle,&Id,&Iq);
 	
 	/* get result */
 	info->Ia = Ia;

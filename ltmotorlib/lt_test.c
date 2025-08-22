@@ -40,7 +40,7 @@ rt_err_t test_motor_dc_config(void)
 	timer_dc = lt_timer_create("dc_timer",TIMER_NAME_1,0);				
 	pid_vel_dc = lt_pid_create(5.6,14.0,0.02,50);						/* sample time: 50ms, unit: ms */
 	pid_pos_dc = lt_pid_create(8.0,0,0,50);							
-	/* timer is not needed in all case, so as sensor */
+	/* hardware timer is not needed in all case, so as sensor */
 	/* check res */
 	if(motor_dc == RT_NULL || driver_dc == RT_NULL || sensor_dc == RT_NULL) return RT_ERROR;
 	if(timer_dc == RT_NULL || pid_vel_dc == RT_NULL || pid_pos_dc == RT_NULL) return RT_ERROR;	
@@ -89,7 +89,7 @@ rt_err_t test_stepper_x_config(void)
 	pid_vel_x = lt_pid_create(28.2,40,0.01,100);							   /* sample time: 100ms, unit: ms */
 	pid_pos_x = lt_pid_create(4,0,0,100);
 	/* sample time: 50ms, unit: ms */
-	/* timer is not needed in all case, so as sensor */
+	/* hardware timer is not needed in all case, so as sensor */
 	/* check res */
 	if(x_stepper == RT_NULL || x_driver == RT_NULL || x_encoder == RT_NULL) return RT_ERROR;
 	if(x_timer == RT_NULL || pid_vel_x == RT_NULL  || pid_pos_x == RT_NULL) return RT_ERROR;	
@@ -138,7 +138,7 @@ rt_err_t test_stepper_y_config(void)
 	y_stepper = lt_motor_create("y_stepper",1,MOTOR_TYPE_STEPPER);
 	y_driver = lt_driver_create(DRIVER_TYPE_STEPPER);
 	y_timer = lt_timer_create("y_timer",TIMER_NAME_3,0);							/* we don't select hardware timer */			
-	/* timer is not needed in all case, so as sensor */
+	/* hardware timer is not needed in all case, so as sensor */
 	/* check res */
 	if(y_stepper == RT_NULL || y_driver == RT_NULL || y_timer == RT_NULL) return RT_ERROR;
 
@@ -200,7 +200,7 @@ rt_err_t test_bldc_x_config(void)
 	lt_driver_set_pwm(driver_bldc_x,PWM_NAME_2,4,PWM_PHASE_C);				/* set three phases pwm and channels */
 	lt_driver_set_pins(driver_bldc_x,0, 0,enable);							
 	lt_sensor_calibrate(sensor_bldc_x);										/* calibrate sensor */
-	
+	lt_sensor_control(sensor_bldc_x,SENSOR_CTRL_ASYNC_READ,RT_NULL);
 	/* config current sense */
 	lt_current_set_adc(curr_bldc_x,ADC_NAME_1,6,11,-1);						/* set adc and channel, -1 means ignored */
 	lt_current_calibrate(curr_bldc_x);										/* calibrate current sense */	
@@ -220,7 +220,7 @@ rt_err_t test_bldc_x_config(void)
 	config.inductance = 0.00425;											/* unit: H */
 	config.KV = 100;						
 	config.resistance = 8;												    /* unit: Ohm */
-	config.poles = 7;														/* pole pairs */
+	config.pole_pairs = 7;														/* pole pairs */
 	config.max_volt = 12;													/* unit: Voltage */
 	
 	return lt_motor_control(x_bldc,BLDC_CTRL_CONFIG,&config);
@@ -265,6 +265,7 @@ rt_err_t test_bldc_y_config(void)
 	lt_driver_set_pwm(driver_bldc_y,PWM_NAME_3,3,PWM_PHASE_C);				/* set three phases pwm and channels */
 	lt_driver_set_pins(driver_bldc_y,0, 0,enable);								/* no need to set pins */
 	lt_sensor_calibrate(sensor_bldc_y);										/* calibrate sensor */
+	lt_sensor_control(sensor_bldc_y,SENSOR_CTRL_ASYNC_READ,RT_NULL);
 	
 	/* config current sense */
 	lt_current_set_adc(curr_bldc_y,ADC_NAME_1,12,15,-1);					/* set adc and channel, -1 means ignored */
@@ -285,7 +286,7 @@ rt_err_t test_bldc_y_config(void)
 	config.inductance = 0.00425;										    /* unit: H */
 	config.KV = 100;						
 	config.resistance = 8;												 	/* unit: Ohm */
-	config.poles = 7;														/* pole pairs */
+	config.pole_pairs = 7;													/* pole pairs */
 	config.max_volt = 12;													/* unit: Voltage */
 	
 	return lt_motor_control(y_bldc,BLDC_CTRL_CONFIG,&config);
@@ -957,6 +958,7 @@ void test_bldc_elec_info(lt_motor_t motor)
 //}
 
 ///* example 2 : stepper interpolation */
+//rt_align(RT_ALIGN_SIZE)
 //static rt_sem_t sem_ex_2;				/* semaphore for test */
 //static rt_thread_t thread_ex_2;			/* stepper thread */
 //static lt_motor_t motor_ex_x;
@@ -1037,10 +1039,104 @@ void test_bldc_elec_info(lt_motor_t motor)
 //	return RT_EOK;
 //}
 
-///* example 3 : one motor follows another */
+/* example 3 : two motors follow */
+rt_align(RT_ALIGN_SIZE)
 
+#define EVENT_BLDC_X_CHECKOUT	(1 << 2)
+#define EVENT_BLDC_Y_CHECKOUT	(1 << 3)
+
+static rt_mailbox_t mail_ex_3;			/* use mailbox to transport data */
+static rt_event_t event_ex_3;			
+
+static rt_thread_t bldc_thread_x;		/* bldc thread */
+static rt_thread_t bldc_thread_y;		/* bldc thread */
+static lt_motor_t bldc_ex_x;
+static lt_motor_t bldc_ex_y;
+
+static void test_example_3_bldc_x_entry(void *parameter)
+{
+	lt_pid_t pid = bldc_ex_x->pid_pos;
+	float input = 1000;
+	float pos,target_pos;
+	rt_err_t res;
+	
+	lt_motor_control(bldc_ex_x,MOTOR_CTRL_OUTPUT_ANGLE,&input);
+	rt_thread_mdelay(5000);
+	input = 0;
+	lt_motor_control(bldc_ex_x,MOTOR_CTRL_OUTPUT_ANGLE,&input);
+	rt_thread_mdelay(5000);
+	lt_motor_disable(bldc_ex_x);										/* disable motor */
+	rt_event_send(event_ex_3,EVENT_BLDC_X_CHECKOUT);					/* send checkout event */
+	/* wait for two motors finishing checkout*/
+	rt_event_recv(event_ex_3,EVENT_BLDC_X_CHECKOUT | EVENT_BLDC_Y_CHECKOUT,RT_EVENT_FLAG_AND,RT_WAITING_FOREVER,RT_NULL);
+	
+	while(1)
+	{
+		pos = lt_motor_get_position(bldc_ex_x)*180.0f/PI;
+		rt_mb_send(mail_ex_3,(rt_base_t)pos);							/* send motor position to another motor */
+		rt_thread_mdelay(200);											/* delay 200ms */
+	}
+}
+
+static void test_example_3_bldc_y_entry(void *parameter)
+{
+	lt_pid_t pid = bldc_ex_y->pid_pos;
+	float input = 1000;
+	float pos,target_pos;
+	rt_err_t res;
+	rt_tick_t tick,dt;
+	
+	lt_motor_control(bldc_ex_y,MOTOR_CTRL_OUTPUT_ANGLE,&input);
+	rt_thread_mdelay(5000);
+	input = 0;
+	lt_motor_control(bldc_ex_y,MOTOR_CTRL_OUTPUT_ANGLE,&input);
+	rt_thread_mdelay(5000);
+	lt_motor_control(bldc_ex_y,BLDC_CTRL_OUTPUT_NO_TIMER,RT_NULL);		/* set close loop output */
+	rt_event_send(event_ex_3,EVENT_BLDC_Y_CHECKOUT);					/* send checkout event */
+	/* wait for two motors finishing checkout*/
+	rt_event_recv(event_ex_3,EVENT_BLDC_X_CHECKOUT | EVENT_BLDC_Y_CHECKOUT,RT_EVENT_FLAG_AND,RT_WAITING_FOREVER,RT_NULL);
+	lt_pid_set_dt(pid,5);
+	tick = rt_tick_get();												/* record current tick, unit: ms */
+	
+	while(1)
+	{
+		res = rt_mb_recv(mail_ex_3,(rt_ubase_t*)&target_pos,RT_WAITING_NO);		/* don't wait */
+		if(res == RT_EOK)	/* get new target pos */
+		{
+			lt_pid_set_target(pid,target_pos);
+		}																							
+		pos = lt_motor_get_position(bldc_ex_x)*180.0f/PI;
+		input = lt_pid_control(pid,pos) * PID_POS_CONST;
+		lt_motor_control(bldc_ex_x,MOTOR_CTRL_OUTPUT,&input);					/* output! */
+		rt_thread_mdelay(5);													/* delay 5ms */
+		
+		dt = rt_tick_get() - tick;
+		tick = rt_tick_get();													/* refresh tick */
+		lt_pid_set_dt(pid,dt);													/* refresh sample time dt */
+	}
+}
+
+rt_err_t test_example_3_config(void)
+{
+	bldc_ex_x = lt_manager_get_motor("x_bldc");
+	bldc_ex_y = lt_manager_get_motor("y_bldc");
+	if(bldc_ex_x == RT_NULL || bldc_ex_y) return RT_ERROR;
+	mail_ex_3 = rt_mb_create("mail_3",5,RT_IPC_FLAG_PRIO);
+	event_ex_3 = rt_event_create("event_3",RT_IPC_FLAG_PRIO);
+	bldc_thread_x = rt_thread_create("ex_3_x_bldc",test_example_3_bldc_x_entry,RT_NULL,1024,20,20);
+	bldc_thread_y = rt_thread_create("ex_3_y_bldc",test_example_3_bldc_y_entry,RT_NULL,1024,10,20);
+	if(mail_ex_3 == RT_NULL || event_ex_3 == RT_NULL || bldc_thread_x == RT_NULL || bldc_thread_y == RT_NULL) 
+	{
+		rt_kprintf("config failed!!! \n");
+		return RT_ERROR;
+	}
+	
+	/* start two threads */
+	rt_thread_startup(bldc_thread_x);
+	rt_thread_startup(bldc_thread_y);
+	
+	return RT_EOK;
+}
 
 
 #endif
-
-

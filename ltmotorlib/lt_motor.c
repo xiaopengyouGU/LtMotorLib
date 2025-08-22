@@ -34,7 +34,9 @@ lt_motor_t lt_motor_create(char* name, rt_uint8_t reduction_ration, rt_uint8_t t
 		case MOTOR_TYPE_STEPPER:
 		{
 			_motor = _motor_stepper_ops.create(name,reduction_ration,type);
+			break;
 		}
+		default:break;
 	}
 	lt_manager_add_motor(_motor);		/* add motor to manager */
 

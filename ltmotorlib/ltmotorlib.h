@@ -22,23 +22,10 @@ extern struct lt_motor_ops _motor_stepper_ops;
 float _constrains(float val, float up_limit, float down_limit);
 float _constrains_dead_region(float val,float up_limit, float down_limit);
 rt_uint8_t _get_rotation_dir(float input);			
-rt_uint8_t _get_quard(int x_pos, int y_pos, rt_uint8_t dir);
-/* check whether start pos and end pos in the same quarent and circle */
-rt_uint8_t _check_circular_pos(int x_start, int y_start, int x_end, int y_end);
-rt_uint8_t _get_center(int x_start, int y_start, int x_end, int y_end,rt_uint16_t r, rt_uint8_t dir, float*x_center, float* y_center);
-rt_uint8_t _check_end(int x_pos, int y_pos, int x_target, int y_target,rt_uint8_t exact);
-rt_int32_t _get_count(float curr, float last,rt_int32_t count, rt_uint8_t volt);
 int _abs(int i);
-int _abs_plus_1(int i,rt_uint8_t dir);
-int _abs_sub_1(int i);
 float _absf(float i);
 float _max(float a, float b);
 float _min(float a, float b);
-float _normalize_angle(float angle_el);
-void _clark_trans(float fa, float fb, float fc, float*f_alpha, float*f_beta);
-void _park_trans(float f_alpha, float f_beta, float angle, float*fd, float*fq);
-void _clark_inv_trans(float f_alpha, float f_beta, float*fa, float*fb, float*fc);
-void _park_inv_trans(float fd, float fq, float angle, float*f_alpha, float*f_beta);
 /************************* common functions ************************************/
 /* foc object */
 #define FOC_TYPE_DEFAULT		0x00
@@ -48,9 +35,6 @@ void _park_inv_trans(float fd, float fq, float angle, float*f_alpha, float*f_bet
 
 struct lt_foc_object
 {
-	float fa;				/* A phase */
-	float fb;				/* B phase */
-	float fc;				/* C phase */
 	float max_val;			
 	rt_uint8_t type;		/* foc type */
 };
@@ -59,8 +43,7 @@ typedef struct lt_foc_object* lt_foc_t;
 lt_foc_t lt_foc_create(void);
 void lt_foc_set_maxval(lt_foc_t foc,float max_val);
 void lt_foc_set_type(lt_foc_t foc,rt_uint8_t type);
-void lt_foc_process(lt_foc_t foc, float fd, float fq, float angle_el);
-void lt_foc_map_duty(lt_foc_t foc,float* dutyA, float* dutyB,float* dutyC);
+void lt_foc_process(lt_foc_t foc, float fd, float fq, float angle_el,float* dutyA, float* dutyB,float* dutyC);
 rt_err_t lt_foc_delete(lt_foc_t foc);
 
 /*******************************************************************************/
@@ -104,7 +87,7 @@ struct lt_curve_generator_object
 	rt_uint16_t dec_start;
 	rt_uint16_t curr_step;			/* current step */
 	rt_uint8_t flag;				/* 0: part velocity table, 1: full velocity table */
-	float* T_nums;                     
+	float* T_nums;                  /* velocity table */   
 };
 typedef struct lt_curve_generator_object* lt_curve_t;
 
@@ -214,7 +197,7 @@ float lt_pid_incre_control(lt_pid_t pid, float curr_val);
 #define ROT_FORWARD				0x01
 #define ROT_REVERSAL			0x02
 #define ROT_DEFAULT				0x00
-
+#define DRIVER_FLAG_ENABLE		0x01
 
 #define PWM_PHASE_DEFAULT	0x00
 #define PWM_PHASE_A	  		0x01
@@ -237,6 +220,7 @@ struct lt_driver_object
 	/* three phase have same period and pulse */
 	
 	rt_uint8_t type;
+	rt_uint8_t flag;
 	const struct lt_driver_ops *ops;		/* driver control operators */
 	void *user_data;
 };
@@ -265,6 +249,12 @@ rt_err_t lt_driver_delete(lt_driver_t driver);
 #define SENSOR_TYPE_HALL			0x03
 #define SENSOR_TYPE_UNKNOWN			0x00
 
+#define SENSOR_CTRL_SYNC_READ		0x00
+#define SENSOR_CTRL_ASYNC_READ		0x01
+
+#define SENSOR_FLAG_SYNC_READ		0x00
+#define SENSOR_FLAG_ASYNC_READ		0x01
+
 struct lt_sensor_object
 {
 	rt_device_t dev;					
@@ -286,6 +276,7 @@ struct lt_sensor_ops
 	float (*get_angle)(lt_sensor_t sensor);
 	float (*get_velocity)(lt_sensor_t sensor,rt_uint32_t measure_time_us );
 	rt_err_t (*calibrate)(lt_sensor_t sensor);
+	rt_err_t (*control)(lt_sensor_t sensor, int cmd, void* arg);
 };
 
 lt_sensor_t lt_sensor_create(char* sensor_name, rt_uint16_t resolution, rt_uint8_t type);
@@ -293,6 +284,7 @@ float lt_sensor_get_angle(lt_sensor_t sensor);
 float lt_sensor_get_velocity(lt_sensor_t sensor, rt_uint32_t measure_time_us);
 rt_err_t lt_sensor_calibrate(lt_sensor_t sensor);
 rt_err_t lt_sensor_delete(lt_sensor_t sensor);
+rt_err_t lt_sensor_control(lt_sensor_t sensor, int cmd, void* arg);
 
 
 /*******************************************************************************/
@@ -362,7 +354,7 @@ lt_current_t lt_current_create(float resistor, float amp_gain, rt_uint8_t bit_nu
 rt_err_t lt_current_set_adc(lt_current_t, char* adc_name,rt_int8_t channel_A, rt_int8_t channel_B, rt_int8_t channel_C);
 rt_err_t lt_current_calibrate(lt_current_t current);
 rt_err_t lt_current_get(lt_current_t current, float*Ia, float*Ib, float*Ic);
-rt_err_t lt_current_get_ab(lt_current_t current, float angel, float*I_alpha, float*I_beta);
+rt_err_t lt_current_get_ab(lt_current_t current, float angle, float*I_alpha, float*I_beta);
 rt_err_t lt_current_get_dq(lt_current_t current, float angle, float dt, float*Id, float*Iq);
 rt_err_t lt_current_get_info(lt_current_t current, float angle, struct lt_current_info* info);
 rt_err_t lt_current_delete(lt_current_t current);
@@ -516,7 +508,7 @@ struct lt_motor_bldc_object
 {
 	struct lt_motor_object parent;
 
-	rt_uint16_t poles;			/* pole pairs number */
+	rt_uint16_t pole_pairs;		/* pole pairs number */
 	float resistance;			/* resistance, unit: ohm */
 	float inductance;			/* inductance, unit: H */
 	float KV;					/* KV value, unit: rpm/V */
@@ -534,7 +526,7 @@ typedef struct lt_motor_bldc_object * lt_bldc_t;
 
 struct lt_bldc_config
 {
-	rt_uint16_t poles;			/* pole pairs number */
+	rt_uint16_t pole_pairs;		/* pole pairs number */
 	float resistance;			/* resistance, unit: ohm */
 	float inductance;			/* inductance, unit: H */
 	float KV;					/* KV value, unit: rpm/V */

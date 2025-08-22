@@ -30,6 +30,14 @@ static rt_err_t _pre_process(lt_interp_t interp,int x_start, int y_start, int x_
 static rt_uint8_t _calc_line(lt_interp_t interp,rt_uint8_t*dir);
 static rt_uint8_t _calc_circular(lt_interp_t interp, rt_uint8_t*dir);
 
+rt_uint8_t _get_quard(int x_pos, int y_pos, rt_uint8_t dir);
+/* check whether start pos and end pos in the same quarent and circle */
+rt_uint8_t _check_circular_pos(int x_start, int y_start, int x_end, int y_end);
+rt_uint8_t _get_center(int x_start, int y_start, int x_end, int y_end,rt_uint16_t r, rt_uint8_t dir, float*x_center, float* y_center);
+rt_uint8_t _check_end(int x_pos, int y_pos, int x_target, int y_target,rt_uint8_t exact);
+int _abs_plus_1(int i,rt_uint8_t dir);
+int _abs_sub_1(int i);
+							
 lt_interp_t lt_interp_create(void)
 {
 	lt_interp_t _interp;
@@ -225,4 +233,131 @@ static rt_uint8_t _calc_circular(lt_interp_t interp, rt_uint8_t*dir)
 	interp->y_pos = y_pos;
 	
 	return move_axis;
+}
+
+/******************************************************************************************************************/
+rt_uint8_t _get_center(int x_start, int y_start, int x_end, int y_end,rt_uint16_t r, rt_uint8_t dir, float*x_center, float* y_center)
+{
+	/* get center of a circle */
+	float x_mid = (x_start + x_end)/2.0f;
+	float y_mid = (y_start + y_end)/2.0f;
+	float dist = (x_end - x_start) * (x_end - x_start);
+	float h,vec_x,vec_y;
+	dist += (y_end - y_start) * (y_end - y_start);
+	dist = sqrtf(dist);
+	
+	if (dist > 2*r) return 0;		/* radius is too small */
+	/* calculate normal vector */
+	vec_x = -1.0f * (y_end - y_start)/dist;
+	vec_y = 1.0f*(x_end - x_start)/dist;
+    
+    /* select center based on dir--> clockwise, counter-clockwise; */
+    h = sqrtf(r*r - (dist/2)*(dist/2));
+    if (dir == DIR_CCW)
+	{
+		*x_center = x_mid + h * vec_x;
+		*y_center = y_mid + h * vec_y;
+	}
+	else
+	{
+		*x_center = x_mid - h * vec_x;
+		*y_center = y_mid - h * vec_y;
+	}
+	return 1;
+}
+
+rt_uint8_t _check_end(int x_pos, int y_pos, int x_target, int y_target,rt_uint8_t exact)
+{
+	rt_uint32_t dist = _abs(x_pos - x_target) + _abs(y_pos - y_target);
+	if(exact == 1)
+	{
+		if(dist == 0 ) return 1;
+	}
+	else
+	{
+		if(dist <= 2) return 1;			/* reach target position */
+	}
+	
+	return 0;
+}
+
+int _abs_plus_1(int i,rt_uint8_t dir)
+{
+	if(i < 0)
+	{
+		return i - 1;
+	}
+	else if (i < 0)
+	{
+		return i + 1;
+	}
+	else
+	{
+		if(dir > 0)
+			return i + 1;
+		else
+			return i - 1;
+	}
+}
+
+int _abs_sub_1(int i)
+{
+	if(i < 0)
+	{
+		return i + 1;
+	}
+	else
+	{
+		return i - 1;
+	}	
+}
+
+
+rt_uint8_t _get_quard(int x_pos, int y_pos, rt_uint8_t dir)
+{
+	if(x_pos > 0)
+	{
+		if(y_pos > 0)	return 0;			/* 1th quadrant */
+		else if(y_pos < 0)	return 3;		/* 4th quadrant */
+		else		/* in + X axis */
+		{
+			if(dir == DIR_CCW) return 0;	/* 1th quadrant */
+			else			   return 3;	/* 4th quadrant */
+		}
+	}
+	else if(x_pos < 0)
+	{
+		if(y_pos > 0)	return 1;			/* 2th quadrant */
+		else if(y_pos < 0)	return 2;		/* 3th quadrant */
+		else		/* in - X axis */
+		{
+			if(dir == DIR_CCW) return 2;	/* 3th quadrant */
+			else			   return 1;	/* 2th quadrant */
+		}
+	}
+	else
+	{				/* in + Y axis*/
+		if(y_pos > 0)
+		{
+			if(dir == DIR_CCW) return 1;	/* 2th quadrant */
+			else			   return 0;	/* 1th quadrant */
+		}
+		else
+		{			/* in - Y axis*/
+			if(dir == DIR_CCW) return 3;	/* 4th quadrant */
+			else			   return 2;	/* 3th quadrant */
+		}
+	}
+}
+
+/* check whether start pos and end pos in the same quarent and circle */
+rt_uint8_t _check_circular_pos(int x_start, int y_start, int x_end, int y_end)
+{
+	int tmp = sqrtf(x_start*x_start + y_start*y_start);/* get radius */
+	float ref = tmp/200;
+	tmp -= sqrtf(x_end*x_end + y_end*y_end);			
+	/* if radius bias are lower than %0.5, we regard that two points are in the same circle */
+	if(tmp >= ref || tmp <= -ref) return 0;	
+	
+	return 1;
 }

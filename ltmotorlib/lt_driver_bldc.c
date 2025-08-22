@@ -16,10 +16,16 @@ rt_err_t _driver_bldc_set_pins(lt_driver_t driver)
 
 rt_err_t _driver_bldc_enable(lt_driver_t driver,rt_uint8_t dir)
 {
+	if(driver->pwm_A == RT_NULL || driver->pwm_channel_A == RT_NULL)	return RT_ERROR;
+	if(driver->pwm_B == RT_NULL || driver->pwm_channel_B == RT_NULL)	return RT_ERROR;
+	if(driver->pwm_C == RT_NULL || driver->pwm_channel_C == RT_NULL)	return RT_ERROR;
+	
 	rt_pwm_enable(driver->pwm_A,driver->pwm_channel_A);
 	rt_pwm_enable(driver->pwm_B,driver->pwm_channel_B);
 	rt_pwm_enable(driver->pwm_C,driver->pwm_channel_C);
 	rt_pin_write(driver->enable_pin,PIN_HIGH);
+	driver->flag = DRIVER_FLAG_ENABLE;
+	
 	return RT_EOK;
 }
 
@@ -28,6 +34,8 @@ rt_err_t _driver_bldc_disable(lt_driver_t driver)
 	rt_pwm_disable(driver->pwm_A,driver->pwm_channel_A);
 	rt_pwm_disable(driver->pwm_B,driver->pwm_channel_B);
 	rt_pwm_disable(driver->pwm_C,driver->pwm_channel_C);
+	driver->flag = 0;
+	
 	return RT_EOK;
 }
 

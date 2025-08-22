@@ -90,7 +90,6 @@ rt_err_t lt_driver_set_output(lt_driver_t driver,rt_uint32_t period,float duty_c
 	period = period*1000;		/* unit: us-> ns */
 	rt_uint32_t pulse = (rt_uint32_t)(period*duty_cycle);
 	
-	//rt_pwm_disable(pwm,channel);							/* disable pwm first */
 	rt_pwm_set(pwm,channel,period,pulse);					/* set pwm output */
 	
 	return RT_EOK;
@@ -99,23 +98,19 @@ rt_err_t lt_driver_set_output(lt_driver_t driver,rt_uint32_t period,float duty_c
 rt_err_t lt_driver_3pwm_output(lt_driver_t driver,rt_uint32_t period,float dutyA,float dutyB, float dutyC)
 {
 	RT_ASSERT(driver != RT_NULL);
-	RT_ASSERT(driver->ops!= RT_NULL);
-	RT_ASSERT(driver->ops->enable != RT_NULL);
-	if(driver->pwm_A == RT_NULL || driver->pwm_channel_A == RT_NULL)	return RT_ERROR;
-	if(driver->pwm_B == RT_NULL || driver->pwm_channel_B == RT_NULL)	return RT_ERROR;
-	if(driver->pwm_C== RT_NULL  || driver->pwm_channel_C == RT_NULL)	return RT_ERROR;
-	dutyA = _constrains(dutyA,0,1);
-	dutyB = _constrains(dutyB,0,1);
-	dutyC = _constrains(dutyC,0,1);
-	
-	period = period*1000;		/* unit: us-> ns */
-	//driver->ops->disable(driver);			/* disable output first */			
-	/* set pwm output */
+	rt_err_t result = RT_EOK;
+	period = period*1000;		/* unit: us-> ns */	
+	int channel = 0;
+	/* set pwm output and enable */
 	rt_pwm_set(driver->pwm_A,driver->pwm_channel_A,period,(rt_uint32_t)(dutyA*period));
 	rt_pwm_set(driver->pwm_B,driver->pwm_channel_B,period,(rt_uint32_t)(dutyB*period));
 	rt_pwm_set(driver->pwm_C,driver->pwm_channel_C,period,(rt_uint32_t)(dutyC*period));
 	
-	return driver->ops->enable(driver,0);
+	if(driver->flag != DRIVER_FLAG_ENABLE)
+	{
+		result = driver->ops->enable(driver,0);
+	}
+	return result;
 }
 
 rt_err_t lt_driver_enable(lt_driver_t driver,rt_uint8_t dir)

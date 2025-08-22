@@ -158,7 +158,7 @@ static void _manager_info(int type)
 	else if(type == MANAGER_INTRO)
 	{
 		rt_kprintf("LtMotorLib --> A motor control library based on RT_Thread RTOS!!!\n ");
-		rt_kprintf("Author: LvTou, Date: 2025/4/22, Version: 0.2 \n");
+		rt_kprintf("Author: LvTou, Date: 2025/6/26, Version: 1.0.1 \n");
 		rt_kprintf("LtMotorLib supports finsh and simple pid interface to help you control motors !\n ");
 		rt_kprintf("Input like this 'ltmotorlib motor cmd' to call correspond functions \n");
 		rt_kprintf("Input 'ltmotorlib list' to see motors' information \n");

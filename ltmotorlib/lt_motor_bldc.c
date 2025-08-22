@@ -124,9 +124,7 @@ static void _bldc_open_loop_timeout(lt_timer_t timer)
 		bldc->parent.status = MOTOR_STATUS_STOP;
 		return;
 	}
-	
-	lt_foc_process(foc,0,Uq,angle*bldc->poles);			    /* transform to electric angle */
-	lt_foc_map_duty(foc,&duty_A,&duty_B,&duty_C);
+	lt_foc_process(foc,0,Uq,angle*bldc->pole_pairs,&duty_A,&duty_B,&duty_C);	/* transform to electric angle */
 	lt_driver_3pwm_output(driver,BLDC_OUTPUT_PERIOD,duty_A,duty_B,duty_C);		/* frequency: 10kHz <==> 100us */
 }
 
@@ -171,11 +169,11 @@ static rt_err_t _motor_bldc_output_angle(lt_bldc_t bldc,float angle)
 
 static void _motor_bldc_config(lt_bldc_t bldc,struct lt_bldc_config* config)
 {
-	if(config->KV <= 0 || config->poles == 0 || config->max_volt == 0 ) return;
+	if(config->KV <= 0 || config->pole_pairs == 0 || config->max_volt == 0 ) return;
 	
 	bldc->inductance = config->inductance;
 	bldc->max_volt = _absf(config->max_volt);
-	bldc->poles = config->poles;
+	bldc->pole_pairs = config->pole_pairs;
 	bldc->resistance = config->resistance;
 	bldc->KV = config->KV;
 	bldc->current = config->current;
@@ -191,14 +189,14 @@ static rt_err_t _motor_bldc_info(lt_bldc_t bldc,int cmd ,struct lt_bldc_info* in
 	bldc->flag |= FLAG_BLDC_GET_INFO;									/* set flag */
 	lt_current_t current = bldc->current;
 	lt_sensor_t sensor = bldc->parent.sensor;
-	float angle_el = lt_sensor_get_angle(sensor)*bldc->poles;
-	info->pos = angle_el/bldc->poles;	
+	float angle_el = lt_sensor_get_angle(sensor)*bldc->pole_pairs;
+	info->pos = angle_el/bldc->pole_pairs;	
 	
 	if(cmd == BLDC_CTRL_GET_ELECTRIC_INFO || cmd == BLDC_CTRL_GET_MOTOR_INFO)
 	{
 		struct lt_current_info current_info;
 		lt_current_get_info(current,angle_el,&current_info);
-		info->angle_el = _normalize_angle(angle_el)*180.0f/PI;
+		//info->angle_el = _normalize_angle(angle_el)*180.0f/PI;
 		info->Ia = current_info.Ia;
 		info->Ib = current_info.Ib;
 		info->Ic = current_info.Ic;
@@ -224,15 +222,14 @@ void _bldc_torque_timeout(lt_timer_t timer)
 	lt_driver_t driver = bldc->parent.driver;
 	lt_pid_t pid = bldc->parent.pid_current;
 	lt_foc_t foc = bldc->foc;
-	float angle_el = lt_sensor_get_angle(bldc->parent.sensor) * bldc->poles;
+	float angle_el = lt_sensor_get_angle(bldc->parent.sensor) * bldc->pole_pairs;
 	float Id,Iq;
 	float control_u;
 	float duty_A, duty_B, duty_C;
 	
 	lt_current_get_dq(bldc->current,angle_el,pid->dt*1000000,&Id,&Iq);	/* unit: s --> us */
 	control_u = PID_CURR_CONST * lt_pid_control(pid,Iq);
-	lt_foc_process(foc,0,control_u,angle_el);
-	lt_foc_map_duty(foc,&duty_A,&duty_B,&duty_C);
+	lt_foc_process(foc,0,control_u,angle_el,&duty_A,&duty_B,&duty_C);
 	lt_driver_3pwm_output(driver,BLDC_OUTPUT_PERIOD,duty_A,duty_B,duty_C);		/* frequency: 10kHz <==> 100us */	
 }
 
@@ -306,15 +303,14 @@ static void _bldc_output(lt_bldc_t bldc, float input)
 		input /= bldc->KV;
 		if(bldc->flag & FLAG_BLDC_GET_INFO)											/* already read current pos */
 		{
-			angle_el = bldc->target_pos * bldc->poles;
+			angle_el = bldc->target_pos * bldc->pole_pairs;
 			bldc->flag = CLEAR_BITS(bldc->flag,FLAG_BLDC_GET_INFO);					/* clear this flag */
 		}
 		else
 		{
-			angle_el = lt_sensor_get_angle(sensor) * bldc->poles;
+			angle_el = lt_sensor_get_angle(sensor) * bldc->pole_pairs;
 		}
-		lt_foc_process(foc,0,input,angle_el);			    				/* transform to electric angle */
-		lt_foc_map_duty(foc,&duty_A,&duty_B,&duty_C);
+		lt_foc_process(foc,0,input,angle_el,&duty_A,&duty_B,&duty_C);			    				/* transform to electric angle */
 		lt_driver_3pwm_output(driver,BLDC_OUTPUT_PERIOD,duty_A,duty_B,duty_C);		/* frequency: 10kHz <==> 100us */
 	}
 	else								/* use timer to control bldc open output */
