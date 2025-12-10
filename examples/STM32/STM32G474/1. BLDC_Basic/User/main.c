@@ -59,7 +59,7 @@ int main(void)
 			continue;
 		}	
 		/* constrains target velocity */	
-		target_vel = CONSTRAINS(target_vel,2000,-2000);
+		target_vel = CONSTRAINS(target_vel,1800,-1800);
 		lt_motor_set_vel(motor,target_vel);
 		
 		/* communicate with the upper computer */
@@ -71,6 +71,8 @@ int main(void)
 		
 }
 
+float I_bus_t;
+float vel_t;
 void communicate(uint32_t count)
 {
 	/* process communication protocol */
@@ -80,19 +82,19 @@ void communicate(uint32_t count)
 	lt_info_t info = lt_motor_get(motor);			/* then get information */
 	LT_CHECK_NULL(info);							/* if we can't get info, return !!! */
 	
-	if(count % 2 == 0)
+	I_bus_t = LOW_PASS_FILTER(info->I_bus * 1000,I_bus_t,0.1f);
+	vel_t = LOW_PASS_FILTER(info->vel,vel_t,0.234f);
+	
+	lt_commut_set_curve(1,(int)(info->target_vel));
+	lt_commut_set_curve(2,(int)(vel_t));
+	lt_commut_set_curve(3,(int)(info->Id * 1000));
+	lt_commut_set_curve(4,(int)(info->Iq * 1000));
+	//lt_commut_set_curve(5,(int)(info->I_bus * 1000));
+	lt_commut_set_curve(5,(int)I_bus_t);
+	/* send data to the upper computer */
+	if(info->flag & MOTOR_FLAG_RUN)
 	{
-		
-		lt_commut_set_curve(1,(int)(info->target_vel));
-		lt_commut_set_curve(2,(int)(info->vel));
-		lt_commut_set_curve(3,(int)(info->Id * 1000));
-		lt_commut_set_curve(4,(int)(info->Iq * 1000));
-		lt_commut_set_curve(5,(int)(info->I_bus * 1000));
-		/* send data to the upper computer */
-		if(info->flag & MOTOR_FLAG_RUN)
-		{
-			lt_commut_send(CMD_SEND_CURVES);
-		}
+		lt_commut_send(CMD_SEND_CURVES);
 	}
 	if(count % 50 == 0)
 	{

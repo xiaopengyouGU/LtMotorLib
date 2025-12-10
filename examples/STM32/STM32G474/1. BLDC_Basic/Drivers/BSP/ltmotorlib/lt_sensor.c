@@ -3,6 +3,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2025-11-23      Lvtou       The first version
+ * 2025-12-09	   Lvtou	   Add hall velocity measure function and modify APIs
  */
 #include "ltmotorlib.h"
 #define SENSOR_FILTER_PARAM 		0.1f		
@@ -14,6 +15,7 @@ lt_sensor_t lt_sensor_create(const char* dev_name)
 	memset(_sensor,0,sizeof(struct lt_sensor_object));
 	/* copy device name */
 	strcpy(_sensor->name, dev_name);
+	_sensor->dir = DIR_CCW;
 	_sensor->flag = DEVICE_FLAG_UNINIT;
 
 	return _sensor;
@@ -52,6 +54,16 @@ void lt_sensor_set(lt_sensor_t sensor, struct lt_sensor_config * config)
 	sensor->flag |= DEVICE_FLAG_CHECKED;
 }
 
+void lt_sensor_set_dir(lt_sensor_t sensor, uint8_t dir)
+{
+#ifdef LT_DEBUG_ENABLE
+	LT_CHECK_SENSOR(sensor);
+#endif
+	if(dir == DIR_CW || dir == DIR_CW)
+			sensor->dir = dir;		
+	else	sensor->dir = DIR_CCW;
+}
+
 void lt_sensor_start(lt_sensor_t sensor)
 {
 #ifdef LT_DEBUG_ENABLE
@@ -76,14 +88,23 @@ void lt_sensor_stop(lt_sensor_t sensor)
 	sensor->ops->stop(sensor);
 	sensor->flag |= DEVICE_FLAG_STOP;
 	sensor->flag = CLEAR_BITS(sensor->flag,DEVICE_FLAG_RUN);
+	sensor->flag = CLEAR_BITS(sensor->flag,DEVICE_FLAG_CALIB);	
+	/* reset device datas */
+	sensor->pos_async = 0;
+	sensor->vel_async = 0;
 }
 
-void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signals)
+void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signals, float* vel)
 {
 #ifdef LT_DEBUG_ENABLE
 	LT_CHECK_SENSOR(sensor);
 #endif
-	sensor->ops->get(sensor,hall_signals);
+	float vel_t;
+	sensor->ops->get2(sensor,hall_signals,&vel_t);
+	*vel = LOW_PASS_FILTER(vel_t,*vel,SENSOR_FILTER_PARAM);
+	/* save pos and vel */	
+	sensor->pos_async = (float)(*hall_signals);
+	sensor->vel_async = *vel;		
 }
 
 /* pos is only inited once and will be process by sensor device */

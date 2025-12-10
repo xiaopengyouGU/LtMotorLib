@@ -30,7 +30,6 @@ uint32_t lt_motor_check(lt_motor_t motor)
 	
 	lt_sensor_t sensor = motor->sensor;
 	lt_current_t current = motor->current;
-	lt_driver_t driver = motor->driver;
 	/* start motor checking */
 	/* calibrating position sensor and current sensor */
 	uint32_t res, res2;
@@ -50,10 +49,6 @@ uint32_t lt_motor_check(lt_motor_t motor)
 		}
 		lt_delay_ms(5);
 	}
-	/* start all hardware drivers */
-	lt_driver_start(driver);
-	lt_current_start(current);
-	lt_sensor_start(sensor);
 	
 	motor->flag |= MOTOR_FLAG_CHECKED;
 	return LT_EOK;
@@ -66,7 +61,33 @@ void lt_motor_start(lt_motor_t motor)
 #endif
 	if(!(motor->flag & MOTOR_FLAG_RUN))				/* motor is not started */
 	{
-		lt_driver_start(motor->driver);			/* stop motor */
+		uint8_t count = 0;
+		uint8_t res, res2;
+		lt_current_t current = motor->current;
+		lt_sensor_t sensor = motor->sensor;
+		lt_driver_t driver = motor->driver;
+		
+		/* calibrate position sensor and current sense at first */
+		while(1)
+		{
+			count++;
+			res = lt_current_calibrate(current);
+			res2 = lt_sensor_calibrate(sensor);
+			if(res == LT_EOK && res2 == LT_EOK)		break;
+			if(count >= 20)
+			{
+#ifdef LT_DEBUG_ENABLE
+				LT_DEBUG(count < 20, "start motor failed!!! ");
+#endif
+				return;
+			}
+			lt_delay_ms(2);
+		}
+		/* start all hardware drivers */
+		lt_sensor_start(sensor);
+		lt_current_start(current);
+		lt_driver_start(driver);				
+		/* start motor */
 		motor->flag |= MOTOR_FLAG_RUN;
 		motor->flag = CLEAR_BITS(motor->flag,MOTOR_FLAG_STOP);
 	}
@@ -77,7 +98,11 @@ void lt_motor_stop(lt_motor_t motor)
 #ifdef LT_DEBUG_ENABLE
 	LT_CHECK_MOTOR(motor);
 #endif
-	lt_driver_stop(motor->driver);			/* stop motor */
+	/* stop all hardwares drivers */
+	lt_driver_stop(motor->driver);	
+	lt_current_stop(motor->current);
+	lt_sensor_stop(motor->sensor);
+	/* stop motor */
 	motor->flag |= MOTOR_FLAG_STOP;
 	motor->flag = CLEAR_BITS(motor->flag,MOTOR_FLAG_RUN);
 }

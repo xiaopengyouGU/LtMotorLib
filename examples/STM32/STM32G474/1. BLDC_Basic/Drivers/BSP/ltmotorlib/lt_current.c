@@ -75,23 +75,38 @@ void lt_current_get_bus(lt_current_t current, uint8_t* pulses,float input,float*
 	uint8_t val = (input > 0) ? 1 : 0;	/*	input > 0 : forward rotation, else : reversal rotation */
 	
 	_current_get(current,&Ia,&Ib,&Ic);
-	/* check conducting phase */
+//	/* check conducting phase */
+//	if(pulses[0] == pulses[1])	/* phase A high impedance */
+//	{
+//		if(pulses[2] == val)	Ip = Ib;	/* B+C- */
+//		else					Ip = Ic; 	/* B-C+ */
+//	}
+//	else if(pulses[2] == pulses[3])/* phase B high impedance */
+//	{
+//		if(pulses[0] == val)	Ip = Ia;	/* A+C- */
+//		else					Ip = Ic;	/* A-C+ */
+//	}
+//	else						 /* phase C high impedance */
+//	{
+//		if(pulses[0] == val)	Ip = Ia;	/* A+B- */
+//		else					Ip = Ib; 	/* A-B+ */
+//	}
+//	
 	if(pulses[0] == pulses[1])	/* phase A high impedance */
 	{
-		if(pulses[2] == val)	Ip = Ib;	/* B+C- */
-		else					Ip = Ic; 	/* B-C+ */
+		if(pulses[2] == val)	Ip = (Ib - Ic)/2.0f;	/* B+C- */
+		else					Ip = (Ic - Ib)/2.0f; 	/* B-C+ */
 	}
 	else if(pulses[2] == pulses[3])/* phase B high impedance */
 	{
-		if(pulses[0] == val)	Ip = Ia;	/* A+C- */
-		else					Ip = Ic;	/* A-C+ */
+		if(pulses[0] == val)	Ip = (Ia - Ic)/2.0f;	/* A+C- */
+		else					Ip = (Ic - Ia)/2.0f;	/* A-C+ */
 	}
 	else						 /* phase C high impedance */
 	{
-		if(pulses[0] == val)	Ip = Ia;	/* A+B- */
-		else					Ip = Ib; 	/* A-B+ */
+		if(pulses[0] == val)	Ip = (Ia - Ib)/2.0f;	/* A+B- */
+		else					Ip = (Ib - Ia)/2.0f; 	/* A-B+ */
 	}
-	
 	/* low pass filter process */
 	*I_bus = LOW_PASS_FILTER(Ip,*I_bus,CURRENT_FILTER_PARAM);
 	/* save bus current */
@@ -210,6 +225,11 @@ void lt_current_stop(lt_current_t current)
 	current->ops->stop(current);
 	current->flag |= DEVICE_FLAG_STOP;
 	current->flag = CLEAR_BITS(current->flag,DEVICE_FLAG_RUN);
+	current->flag = CLEAR_BITS(current->flag,DEVICE_FLAG_CALIB);	
+	/* reset device datas */
+	current->I_bus_async = 0;
+	current->Id_async = 0;
+	current->Iq_async = 0;
 }
 
 void lt_current_delete(lt_current_t current)
