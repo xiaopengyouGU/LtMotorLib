@@ -3,6 +3,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2025-11-19  	  Lvtou		   The first version
+ * 2025-12-09	  Lvtou		   Add hall velocity measure function and modify APIs
  */
 #include "ltmotorlib.h"
 lt_sensor_t sensor;
@@ -65,6 +66,9 @@ void hall_gpio_init(void)
 /********************************************************************************************/
 /* position sensor device operators' hardware implementation */
 static struct lt_sensor_ops ops;
+static uint32_t count = 0;
+static uint8_t value_old = 0;							/* old value */
+static float vel_old = 0;								/* old velocity */
 
 void drv_sensor_init(void)
 {	
@@ -80,6 +84,9 @@ void drv_sensor_init(void)
 	lt_sensor_set(sensor,&config);
 }
 
+#define HALL_VEL_GAINS		2.0f*136363.6f  /* (60.0f/((2.0f * 4.0f)*(55.0f * 1e-6f))) : 60 / Ts / 2 / pn / count */ 
+#define HALL_VEL_MAX		4000.0f
+
 static void _hall_start(lt_sensor_t sensor)
 {
 	if(sensor->flag & DEVICE_FLAG_CALIBING)	/* this hall sensor is firstly started, we need to init it */
@@ -91,12 +98,22 @@ static void _hall_start(lt_sensor_t sensor)
 
 static void _hall_calibrate(lt_sensor_t sensor)
 {
+	count = 0;
+	value_old = 0;
+	vel_old = 0;
 	sensor->flag |= DEVICE_FLAG_CALIB;
 }
 
-static void _hall_get(lt_sensor_t sensor, void* val)
+static void _sensor_get(lt_sensor_t sensor, float* pos)
 {
+	
+}
+
+static void _hall_get2(lt_sensor_t sensor, uint8_t* signal, float* vel)
+{	
+	uint8_t value = 0;
 	uint8_t hall_signal = 0;
+	
 	if(HAL_GPIO_ReadPin(HALL1_TIM_CH1_GPIO, HALL1_TIM_CH1_PIN) != GPIO_PIN_RESET)  /* read U phase */
 	{
 		hall_signal |= 0x04;
@@ -108,10 +125,37 @@ static void _hall_get(lt_sensor_t sensor, void* val)
 	if(HAL_GPIO_ReadPin(HALL1_TIM_CH3_GPIO, HALL1_TIM_CH3_PIN) != GPIO_PIN_RESET)  /* read W phase */
 	{
 		hall_signal |= 0x01;
+		value = 1;
 	}
 	
-	uint8_t* res = (uint8_t *)val;		/* type transform */
-	*res = hall_signal;
+	/* get position and velocity */
+	if(value_old == value)
+	{
+		count++;
+		if(count > 40000)		/* we can assume that motor is stopped, t = 40000*55us =  2200ms = 2.2s  */
+		{
+			count = 0;
+			vel_old = 0;
+			return;			
+		}
+	}
+	else					   /* measure time in edge */	
+	{
+		if(count != 0)
+		{
+			vel_old =  HALL_VEL_GAINS /((float)count);
+			vel_old = (vel_old > HALL_VEL_MAX)? HALL_VEL_MAX : vel_old;
+			/* get velocity */
+			if(sensor->dir == DIR_CW) vel_old = -vel_old;
+		}
+		else	vel_old = 0;		/* error velocity, set zero velocity */
+		
+		value_old = value;		/* refresh old hall value */
+		count = 0;
+	}
+	
+	*vel = vel_old;
+	*signal = hall_signal;		/* type transform */
 }
 
 static void _hall_stop(lt_sensor_t sensor)
@@ -122,7 +166,8 @@ static void _hall_stop(lt_sensor_t sensor)
 static struct lt_sensor_ops ops = {	
 										_hall_start,
 										_hall_calibrate,
-										_hall_get,
+										_sensor_get,
+										_hall_get2,
 										_hall_stop,
 };
 

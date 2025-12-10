@@ -211,6 +211,7 @@ struct lt_sensor_object
 	float pos_async;
 	float vel_async;
 	
+	uint8_t dir;
 	uint8_t flag;					
 	uint8_t type;
 	const struct lt_sensor_ops* ops;	/* operators */
@@ -232,16 +233,18 @@ struct lt_sensor_ops
 {
 	void (*start)(lt_sensor_t sensor);
 	void (*calibrate)(lt_sensor_t sensor);
-	void (*get)(lt_sensor_t sensor, void *value);
+	void (*get)(lt_sensor_t sensor, float *pos);
+	void (*get2)(lt_sensor_t sensor, uint8_t *value, float* vel);
 	void (*stop)(lt_sensor_t sensor);
 };
 
 lt_sensor_t lt_sensor_create(const char* dev_name);
 void lt_sensor_set(lt_sensor_t sensor, struct lt_sensor_config * config);
+void lt_sensor_set_dir(lt_sensor_t sensor, uint8_t dir);
 void lt_sensor_start(lt_sensor_t sensor);
 void lt_sensor_stop(lt_sensor_t sensor);
 void lt_sensor_get(lt_sensor_t sensor, float* pos,float* vel);
-void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signal);
+void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signal, float*vel);
 /* asynchronous functions */
 void lt_sensor_get_async(lt_sensor_t sensor,float* pos,float* vel);
 uint32_t lt_sensor_calibrate(lt_sensor_t sensor);

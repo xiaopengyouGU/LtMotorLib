@@ -68,6 +68,10 @@
 #define LT_ERROR					1
 #define LT_EBUSY					2				
 
+/* direction */
+#define DIR_CCW							0x00
+#define DIR_CW							0x01
+
 /* many types of error may appear at the same time !!! */
 #define  ERROR_TYPE_HALL_ENC    		0x01 	/* hall sensor or encoder error*/   
 #define  ERROR_TYPE_OVER_SPEED			0x02	

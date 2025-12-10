@@ -62,7 +62,16 @@ void ltm_motor_run(void)
 	if(motor->flag & MOTOR_FLAG_RUN)
 	{
 		input = lt_motor_get_vtar(motor);		
-		lt_sensor_get2(sensor,&hall_signal); 
+		if(input < 0)
+		{
+			lt_sensor_set_dir(sensor,DIR_CW);
+		}
+		else
+		{
+			lt_sensor_set_dir(sensor,DIR_CCW);
+		}
+		
+		lt_sensor_get2(sensor,&hall_signal,&vel);			
 		pulse = lt_trape_process(trape,hall_signal,input,&duty);	/* get output pulse sequence */
 		lt_current_get_bus(current,pulse,input,&I_bus);				/* get dc current */
 		
