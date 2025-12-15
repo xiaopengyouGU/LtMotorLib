@@ -4,7 +4,8 @@
  * Date           Author       Notes
  * 2025-6-21      Lvtou        The first version
  * 2025-10-21     Lvtou        Remove dependancies on RT-Thread 
- * 2025-11-29	  Lvtou		   Modity API and improve computation efficiency 
+ * 2025-11-29	  Lvtou		   Modity API and improve computation efficiency
+ * 2025-12-15	  Lvtou		   Exchange the implementations of two types of pid 
  */
 #include "ltmotorlib.h"
 
@@ -92,7 +93,33 @@ float lt_pid_get(lt_pid_t pid)
 	return pid->output;
 }
 
-float lt_pid_process(lt_pid_t pid,float curr_val)
+float lt_pid_process(lt_pid_t pid,float curr_val)	/* increment pid */
+{
+#ifdef LT_DEBUG_ENABLE	
+	LT_CHECK_NULL(pid);
+#endif
+	float err = pid->target - curr_val;
+	float err_prev = pid->err_prev;
+	float P,I,D;
+	float output_limit = pid->output_limit;
+	float output;
+	/* start calculation */
+	P = pid->Kp * (err - err_prev);
+	I = pid->Ki_ts * err;
+	D = pid->Kd_ts * (err - 2.0f*err_prev + pid->err_prev2);
+	/* output limit */
+	output = pid->output + P + I + D;
+	output = CONSTRAINS(output, output_limit, -output_limit);
+	
+	/* refresh pid parameters */
+	pid->err_prev = err;
+	pid->err_prev2 = err_prev;
+	pid->output = output;
+	
+	return output;
+}
+
+float lt_pid_process2(lt_pid_t pid, float curr_val)		/* position pid */
 {
 #ifdef LT_DEBUG_ENABLE	
 	LT_CHECK_NULL(pid);
@@ -116,32 +143,6 @@ float lt_pid_process(lt_pid_t pid,float curr_val)
 	/* refresh pid parameters */
 	pid->err = err;
 	pid->integral = I;
-	pid->output = output;
-	
-	return output;
-}
-
-float lt_pid_process2(lt_pid_t pid, float curr_val)		/* increment pid */
-{
-#ifdef LT_DEBUG_ENABLE	
-	LT_CHECK_NULL(pid);
-#endif
-	float err = pid->target - curr_val;
-	float err_prev = pid->err_prev;
-	float P,I,D;
-	float output_limit = pid->output_limit;
-	float output;
-	/* start calculation */
-	P = pid->Kp * (err - err_prev);
-	I = pid->Ki_ts * err;
-	D = pid->Kd_ts * (err - 2.0f*err_prev + pid->err_prev2);
-	/* output limit */
-	output = pid->output + P + I + D;
-	output = CONSTRAINS(output, output_limit, -output_limit);
-	
-	/* refresh pid parameters */
-	pid->err_prev = err;
-	pid->err_prev2 = err_prev;
 	pid->output = output;
 	
 	return output;
