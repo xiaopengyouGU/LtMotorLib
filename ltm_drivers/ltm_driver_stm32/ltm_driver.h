@@ -7,7 +7,7 @@
 
 /******************************************************************************************/
 void ltm_driver_init(void);							/* init all hardware drivers */
-void ltm_motor_run(void);							/* motor operation function */
+void ltm_motor_run(uint8_t loop_flag);				/* motor operation function */
 /* driver init functions */
 void drv_system_init(void);							/* system init function */
 void drv_current_init(void);						/* current sense driver init function */

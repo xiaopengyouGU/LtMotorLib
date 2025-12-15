@@ -11,8 +11,8 @@
 /* version information */
 #define LT_MOTOR_LIB_VERSION_MAJOR 0
 #define LT_MOTOR_LIB_VERSION_MINOR 1
-#define LT_MOTOR_LIB_VERSION_PATCH 0
-#define LT_MOTOR_LIB_VERSION "0.1.0"
+#define LT_MOTOR_LIB_VERSION_PATCH 1
+#define LT_MOTOR_LIB_VERSION "0.1.1"
 
 /* debug mode */
 #define LT_DEBUG_ENABLE
@@ -64,9 +64,14 @@
 #define DEVICE_FLAG_INIT		0x01
 #define DEVICE_FLAG_UNINIT		0x00
 /* states flags */
-#define LT_EOK						0
-#define LT_ERROR					1
-#define LT_EBUSY					2				
+#define LT_EOK							0x00
+#define LT_ERROR						0x01
+#define LT_EBUSY						0x02
+
+/* close loop flag */
+#define LOOP_FLAG_CURRENT				0x01
+#define LOOP_FLAG_VELOCITY				0x02
+#define LOOP_FLAG_POSITION				0x03
 
 /* direction */
 #define DIR_CCW							0x00

@@ -223,6 +223,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if(htim->Instance == BTIM_TIMX_INT)                                     /* 1ms */
     {
 		cnt++;
+		ltm_motor_run(LOOP_FLAG_VELOCITY);
 //		/* we can do safe protection in interruption, but we better do the same in RTOS threads */
 //		/* safe protection ! */	
 //		if((count % 500) == 0)						/* 500 ms : check temperature */
@@ -251,8 +252,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void drv_timer_init(void)
 {	
-	/* because we use center aligned PWM, so fpwm = 1/(2*(arr+1)*(psc+1) = 18K */
-	atim_timx_oc_chy_init((170000 / 36) - 1, 0);            /* 中断频率18K，约55us, 频率不能过慢或过快，否则都会导致电机堵转 */
+	/* because we use center aligned PWM, so fpwm = 1/(2*(arr+1)*(psc+1) = 16K */
+	atim_timx_oc_chy_init((170000 / 32) - 1, 0);            /* 中断频率16K，约62.5us, 频率不能过慢或过快，否则都会导致电机堵转 */
 	btim_timx_int_init(1000 - 1, 170 - 1);     				/* 基本定时器初始化，1ms中断一次 */
 }
 

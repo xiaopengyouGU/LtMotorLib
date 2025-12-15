@@ -248,7 +248,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 		}
 		else
 		{
-			ltm_motor_run();			/* start motor control*/
+			ltm_motor_run(LOOP_FLAG_CURRENT);						/* start motor control*/
 			/* trigger FOC calculation  thread */
 		}
     }

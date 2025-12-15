@@ -60,7 +60,7 @@ void lt_sensor_set_dir(lt_sensor_t sensor, uint8_t dir)
 	LT_CHECK_SENSOR(sensor);
 #endif
 	if(dir == DIR_CW || dir == DIR_CW)
-			sensor->dir = dir;		
+			sensor->dir = dir;
 	else	sensor->dir = DIR_CCW;
 }
 
@@ -102,9 +102,9 @@ void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signals, float* vel)
 	float vel_t;
 	sensor->ops->get2(sensor,hall_signals,&vel_t);
 	*vel = LOW_PASS_FILTER(vel_t,*vel,SENSOR_FILTER_PARAM);
-	/* save pos and vel */	
+	/* save pos and vel */
 	sensor->pos_async = (float)(*hall_signals);
-	sensor->vel_async = *vel;		
+	sensor->vel_async = *vel;
 }
 
 /* pos is only inited once and will be process by sensor device */

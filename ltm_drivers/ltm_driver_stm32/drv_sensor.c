@@ -84,7 +84,7 @@ void drv_sensor_init(void)
 	lt_sensor_set(sensor,&config);
 }
 
-#define HALL_VEL_GAINS		2.0f*136363.6f  /* (60.0f/((2.0f * 4.0f)*(55.0f * 1e-6f))) : 60 / Ts / 2 / pn / count */ 
+#define HALL_VEL_GAINS		2.0f*136363.6f  /* (60.0f/((2.0f * 4.0f)*(55.0f * 1e-6f))) : 60 / Ts / 2 / pn / count */
 #define HALL_VEL_MAX		4000.0f
 
 static void _hall_start(lt_sensor_t sensor)
@@ -106,14 +106,14 @@ static void _hall_calibrate(lt_sensor_t sensor)
 
 static void _sensor_get(lt_sensor_t sensor, float* pos)
 {
-	
+
 }
 
 static void _hall_get2(lt_sensor_t sensor, uint8_t* signal, float* vel)
-{	
+{
 	uint8_t value = 0;
 	uint8_t hall_signal = 0;
-	
+
 	if(HAL_GPIO_ReadPin(HALL1_TIM_CH1_GPIO, HALL1_TIM_CH1_PIN) != GPIO_PIN_RESET)  /* read U phase */
 	{
 		hall_signal |= 0x04;
@@ -127,7 +127,7 @@ static void _hall_get2(lt_sensor_t sensor, uint8_t* signal, float* vel)
 		hall_signal |= 0x01;
 		value = 1;
 	}
-	
+
 	/* get position and velocity */
 	if(value_old == value)
 	{
@@ -153,7 +153,7 @@ static void _hall_get2(lt_sensor_t sensor, uint8_t* signal, float* vel)
 		value_old = value;		/* refresh old hall value */
 		count = 0;
 	}
-	
+
 	*vel = vel_old;
 	*signal = hall_signal;		/* type transform */
 }

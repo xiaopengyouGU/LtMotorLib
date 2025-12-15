@@ -404,15 +404,15 @@ void _process_data(lt_commut_t commut)
 		}
 		case STOP_CMD:
 		{
-			_send(SEND_STOP_CMD,CURVES_CH1,NULL,0);
 			lt_motor_stop(motor);
+			_send(SEND_STOP_CMD,CURVES_CH1,NULL,0);
 			break;
 		}
 		case RESET_CMD:
 		{
 			lt_pid_reset(pid);				 		 				/* reset pid! */
-			_send(SEND_STOP_CMD,CURVES_CH1,NULL,0);
 			lt_motor_stop(motor);									/* stop motor */
+			_send(SEND_STOP_CMD,CURVES_CH1,NULL,0);
 			break;
 		}
 		case SET_PERIOD_CMD:

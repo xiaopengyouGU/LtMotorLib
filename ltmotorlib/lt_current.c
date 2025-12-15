@@ -75,23 +75,6 @@ void lt_current_get_bus(lt_current_t current, uint8_t* pulses,float input,float*
 	uint8_t val = (input > 0) ? 1 : 0;	/*	input > 0 : forward rotation, else : reversal rotation */
 	
 	_current_get(current,&Ia,&Ib,&Ic);
-//	/* check conducting phase */
-//	if(pulses[0] == pulses[1])	/* phase A high impedance */
-//	{
-//		if(pulses[2] == val)	Ip = Ib;	/* B+C- */
-//		else					Ip = Ic; 	/* B-C+ */
-//	}
-//	else if(pulses[2] == pulses[3])/* phase B high impedance */
-//	{
-//		if(pulses[0] == val)	Ip = Ia;	/* A+C- */
-//		else					Ip = Ic;	/* A-C+ */
-//	}
-//	else						 /* phase C high impedance */
-//	{
-//		if(pulses[0] == val)	Ip = Ia;	/* A+B- */
-//		else					Ip = Ib; 	/* A-B+ */
-//	}
-//	
 	if(pulses[0] == pulses[1])	/* phase A high impedance */
 	{
 		if(pulses[2] == val)	Ip = (Ib - Ic)/2.0f;	/* B+C- */

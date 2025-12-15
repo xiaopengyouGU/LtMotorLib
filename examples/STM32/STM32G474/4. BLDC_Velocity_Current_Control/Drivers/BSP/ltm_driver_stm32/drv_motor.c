@@ -34,7 +34,7 @@ void drv_motor_init(void)
 	/* Six-Step commutation part */
 	trape = lt_trape_create(24,TRAPZOID_MODE_DEFAULT);			/* DC bus voltage */
 	pid_vel = lt_pid_create(0.004,0.020,0.0,1);					/* sample period : 1ms */
-	pid_curr = lt_pid_create(0.2,25,0.0,0.055);					/* sample period : 0.055ms = 55us */
+	pid_curr = lt_pid_create(0.2,25,0.0,0.0625);				/* sample period : 0.0625ms = 62.5us ==> 16k */
 	LT_CHECK_NULL(trape);
 	LT_CHECK_NULL(pid_vel);
 	LT_CHECK_NULL(pid_curr);
