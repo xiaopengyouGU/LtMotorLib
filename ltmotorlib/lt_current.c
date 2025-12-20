@@ -72,7 +72,7 @@ void lt_current_get_bus(lt_current_t current, uint8_t* pulses,float input,float*
 #endif
 	float Ia, Ib, Ic;
 	float Ip;					/* phase current */
-	uint8_t val = (input > 0) ? 1 : 0;	/*	input > 0 : forward rotation, else : reversal rotation */
+	uint8_t val = (input >= 0) ? 1 : 0;	/*	input > 0 : forward rotation, else : reversal rotation */
 	
 	_current_get(current,&Ia,&Ib,&Ic);
 	if(pulses[0] == pulses[1])	/* phase A high impedance */

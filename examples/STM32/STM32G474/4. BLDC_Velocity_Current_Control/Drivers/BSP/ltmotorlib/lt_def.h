@@ -4,6 +4,7 @@
  * Date           Author       Notes
  * 2025-6-21      Lvtou        The first version
  * 2025-11-15	  Lvtou 	   The second version
+ * 2025-12-20	  Lvtou		   Modify motor flag type	
  */
 #ifndef __LT_DEF_H__
 #define __LT_DEF_H__
@@ -45,15 +46,17 @@
 #define LT_NAME_MAX					8
 
 /* motor status flags */
-#define MOTOR_FLAG_RUN			0x08
-#define MOTOR_FLAG_CHECKED		0x04
-#define MOTOR_FLAG_STOP			0x02
-#define MOTOR_FLAG_INIT			0x01
-#define MOTOR_FLAG_UNINIT		0x00
-#define MOTOR_FLAG_OPEN_LOOP	0x10
-#define MOTOR_FLAG_CLOSE_LOOP	0x20
-#define MOTOR_FLAG_BREAKED		0x40
-#define MOTOR_FLAG_BLOCKED		0x80
+#define MOTOR_FLAG_CLOSE_LOOP	0x200
+#define MOTOR_FLAG_OPEN_LOOP	0x100
+#define MOTOR_FLAG_OVER_CURRENT	0x080	
+#define MOTOR_FLAG_BREAKING		0x040
+#define MOTOR_FLAG_LOCKED		0x020
+#define MOTOR_FLAG_START		0x010
+#define MOTOR_FLAG_RUN			0x008
+#define MOTOR_FLAG_STOP			0x004
+#define MOTOR_FLAG_CHECKED		0x002
+#define MOTOR_FLAG_INIT			0x001
+#define MOTOR_FLAG_UNINIT		0x000
 
 /* device flags*/
 #define DEVICE_FLAG_CHECKED		0x20
@@ -72,6 +75,7 @@
 #define LOOP_FLAG_CURRENT				0x01
 #define LOOP_FLAG_VELOCITY				0x02
 #define LOOP_FLAG_POSITION				0x03
+
 
 /* direction */
 #define DIR_CCW							0x00

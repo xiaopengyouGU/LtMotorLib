@@ -274,7 +274,7 @@ struct lt_motor_info
 	float vbus;				/* DC bus votage */
 	float bemf[3];			/* Back EMF, A,B,C phase, unit : V */
 	float te;				/* torque : N.m */
-	uint8_t flag;			/* motor states flag */
+	uint16_t flag;			/* motor states flag */
 };
 
 struct lt_motor_param
@@ -310,7 +310,7 @@ struct lt_motor_object
 	struct lt_motor_info info;		/* motor information for monitoring */
 	float V_target;					/* target voltage : only for open loop control !!! */
 	
-	uint8_t flag;					/* motor flag */
+	uint16_t flag;					/* motor flag */
 	uint8_t type;					/* motor type */
 };
 
