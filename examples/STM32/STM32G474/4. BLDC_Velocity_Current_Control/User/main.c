@@ -25,8 +25,8 @@ int main(void)
 	if(res == LT_EOK)
 	{
 		lt_motor_start(motor);		/* don't forget this part */
-		//lt_commut_set_motor(motor,PID_TYPE_VEL);
 		lt_commut_set_motor(motor,PID_TYPE_VEL);
+		//lt_commut_set_motor(motor,PID_TYPE_CURR_Q);
 		printf("电机检查完毕，硬件校准完毕!!! \r\n");
 		printf("电机启动!!! \r\n");
 		printf("按下KEY0 开始正转加速\r\n");
@@ -69,6 +69,7 @@ int main(void)
 		lt_delay_ms(5);
 		count++;
 	}
+	
 		
 }
 
@@ -83,15 +84,13 @@ void communicate(uint32_t count)
 	lt_info_t info = lt_motor_get(motor);			/* then get information */
 	LT_CHECK_NULL(info);							/* if we can't get info, return !!! */
 	
-	I_bus_t = LOW_PASS_FILTER(info->I_bus * 1000,I_bus_t,0.1f);
 	vel_t = LOW_PASS_FILTER(info->vel,vel_t,0.234f);
 	
 	lt_commut_set_curve(1,(int)(info->target_vel));
 	lt_commut_set_curve(2,(int)(vel_t));
 	lt_commut_set_curve(3,(int)(info->Id * 1000));
 	lt_commut_set_curve(4,(int)(info->Iq * 1000));
-	//lt_commut_set_curve(5,(int)(info->I_bus * 1000));
-	lt_commut_set_curve(5,(int)I_bus_t);
+	lt_commut_set_curve(5,(int)(info->I_bus * 1000));
 	/* send data to the upper computer */
 	if(info->flag & MOTOR_FLAG_RUN)
 	{

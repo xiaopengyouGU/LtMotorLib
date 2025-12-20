@@ -84,7 +84,7 @@ void drv_sensor_init(void)
 	lt_sensor_set(sensor,&config);
 }
 
-#define HALL_VEL_GAINS		2.0f*136363.6f  /* (60.0f/((2.0f * 4.0f)*(55.0f * 1e-6f))) : 60 / Ts / 2 / pn / count */
+#define HALL_VEL_GAINS		240000.0f  /* (60.0f/((2.0f * 4.0f)*(62.5f * 1e-6f))) : 60 / Ts / 2 / pn / count */
 #define HALL_VEL_MAX		4000.0f
 
 static void _hall_start(lt_sensor_t sensor)
@@ -132,7 +132,7 @@ static void _hall_get2(lt_sensor_t sensor, uint8_t* signal, float* vel)
 	if(value_old == value)
 	{
 		count++;
-		if(count > 40000)		/* we can assume that motor is stopped, t = 40000*55us =  2200ms = 2.2s  */
+		if(count > 10000)		/* we can assume that motor is stopped, t = 10000*62.5us =  625ms = 0.625s  */
 		{
 			count = 0;
 			vel_old = 0;
