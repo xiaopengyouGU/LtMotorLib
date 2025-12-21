@@ -65,11 +65,9 @@ int main(void)
 		
 		/* communicate with the upper computer */
 		communicate(count);
-		
 		lt_delay_ms(5);
 		count++;
 	}
-	
 		
 }
 

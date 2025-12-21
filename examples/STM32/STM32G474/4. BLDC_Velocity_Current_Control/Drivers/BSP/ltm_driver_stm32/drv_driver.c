@@ -49,6 +49,7 @@ void drv_driver_init(void)
 	/* config current device */
 	struct lt_driver_config config;
 	config.ops = &ops;
+	config.name = NULL;
 	
 	lt_driver_set(driver,&config);
 }

@@ -78,9 +78,9 @@ void drv_sensor_init(void)
 	if(sensor == NULL) return;
 	/* config current device */
 	struct lt_sensor_config config;
+	config.name = NULL;
 	config.ops = &ops;
 	config.type = SENSOR_TYPE_HALL;
-
 	lt_sensor_set(sensor,&config);
 }
 

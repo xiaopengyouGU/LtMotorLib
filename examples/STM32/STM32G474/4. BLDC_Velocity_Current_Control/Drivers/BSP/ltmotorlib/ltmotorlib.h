@@ -196,9 +196,12 @@ void lt_driver_output2(lt_driver_t driver, uint8_t* pulses, float duty);
 void lt_driver_delete(lt_driver_t driver);
 /*******************************************************************************/
 /* position sensor object */
-#define SENSOR_TYPE_HALL 	0x01
-#define SENSOR_TYPE_MAGNET 	0x02
-#define SENSOR_TYPE_ENCODER	0x03
+#define SENSOR_TYPE_HALL 			0x01
+#define SENSOR_TYPE_MAGNET 			0x02
+#define SENSOR_TYPE_ENCODER			0x03
+/* support 2 software position sensors */
+#define SENSOR_TYPE_SOFTWARE 		0x04
+#define SENSOR_TYPE_SOFTWARE2		0x05
 
 typedef struct lt_sensor_object * lt_sensor_t;
 struct lt_sensor_object
@@ -233,8 +236,8 @@ struct lt_sensor_ops
 {
 	void (*start)(lt_sensor_t sensor);
 	void (*calibrate)(lt_sensor_t sensor);
-	void (*get)(lt_sensor_t sensor, float *pos);
-	void (*get2)(lt_sensor_t sensor, uint8_t *value, float* vel);
+	void (*get)(lt_sensor_t sensor, float* pos);
+	void (*get2)(lt_sensor_t sensor, uint8_t* hall_signal, float* vel);
 	void (*stop)(lt_sensor_t sensor);
 };
 
@@ -244,7 +247,7 @@ void lt_sensor_set_dir(lt_sensor_t sensor, uint8_t dir);
 void lt_sensor_start(lt_sensor_t sensor);
 void lt_sensor_stop(lt_sensor_t sensor);
 void lt_sensor_get(lt_sensor_t sensor, float* pos,float* vel);
-void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signal, float*vel);
+void lt_sensor_get2(lt_sensor_t sensor, uint8_t* hall_signal, float* vel);
 /* asynchronous functions */
 void lt_sensor_get_async(lt_sensor_t sensor,float* pos,float* vel);
 uint32_t lt_sensor_calibrate(lt_sensor_t sensor);

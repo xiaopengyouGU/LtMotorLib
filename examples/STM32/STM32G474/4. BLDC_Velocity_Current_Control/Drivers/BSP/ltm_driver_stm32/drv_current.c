@@ -304,6 +304,7 @@ void drv_current_init(void)
 	if(current == NULL) return;
 	/* config current device */
 	struct lt_current_config config;
+	config.name = NULL;
 	config.amp_gain = 6;
 	config.bit_num = 12;
 	config.vbus_gain = 1.0f/25;
