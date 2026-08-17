@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"D:/Develop/LtMotorLib/LTM_HAL/ltm_hal_ra8t2_boot/example/build/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

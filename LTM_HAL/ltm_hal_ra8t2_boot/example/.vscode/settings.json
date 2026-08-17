@@ -1,9 +1,0 @@
-{
-    "C_Cpp.files.exclude": {
-        "**/build/**": true
-    },
-    "C_Cpp.errorSquiggles": "Enabled",
-    "search.exclude": {
-        "**/build/**": true
-    }
-}
