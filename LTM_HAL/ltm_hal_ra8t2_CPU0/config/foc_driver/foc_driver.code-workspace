@@ -1,0 +1,21 @@
+{
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../foc_driver_CPU0"
+    },
+    {
+      "path": "../foc_driver_CPU1"
+    }
+  ],
+  "settings": {
+    "cmake.options.statusBarVisibility": "visible",
+    "clangd.arguments": [
+      "--query-driver=${env:ARM_GCC_TOOLCHAIN_PATH}*",
+      "--compile-commands-dir=${workspaceFolder}",
+      "--background-index"
+    ]
+  }
+}

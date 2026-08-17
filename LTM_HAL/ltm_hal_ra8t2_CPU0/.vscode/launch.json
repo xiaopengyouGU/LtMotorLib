@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "J-Link Debug (Cortex-Debug)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/example/build/ltm_sdk_example.elf",
+            "device": "R7KA8T2LF_CPU0",
+            "interface": "swd",
+            "speed": 1000,
+            // 注意这里：您需要在文件夹里确认一下您的 JLinkGDBServerCL.exe 到底在哪里！
+            // 如果是在 JLink_V936 文件夹里，就填下面的路径。如果是 JLink_V9.36 就自己改一下。
+            "jlinkPath": "D:/GoodThing/HPM_SDK_Develop/JLink/JLink_V936/JLinkGDBServerCL.exe", 
+            "gdbPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gdb.exe",
+            "runToMain": true, // 自动断点在 main 函数
+            "showDevDebugOutput": "raw", // 打印详细的通讯日志，报错了立刻能看到
+            "preLaunchCommands": ["monitor reset"] // 每次调试前复位 MCU
+        }
+    ]
+}

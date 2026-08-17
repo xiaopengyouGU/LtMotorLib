@@ -1,0 +1,1 @@
+com.renesas.cdt.ddsc.project.standalone.trustzone/secureBundleLoc=${workspace_loc:foc_driver_CPU0}/${VAR_CMAKE_BUILD_CONFIG_OUTPUT}/foc_driver_CPU0.sbd

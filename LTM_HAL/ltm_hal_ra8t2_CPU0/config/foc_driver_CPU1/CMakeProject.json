@@ -1,0 +1,77 @@
+{
+  "cpuType": "cortex-m33",
+  "deviceName": "R7KA8T2LFLCAB",
+  "coreName": "CPU1",
+  "compilerType": "GCC",
+  "deviceCommand": "R7KA8T2LF",
+  "buildArtifactType": "EXECUTABLE",
+  "secureBundleLocation": "${workspace_loc:foc_driver_CPU0}/${VAR_CMAKE_BUILD_CONFIG_OUTPUT}/foc_driver_CPU0.sbd",
+  "activeBuildConfiguration": "Release",
+  "buildConfigurations": {
+    "Debug": {
+      "definedMacros": [
+        "_RA_CORE=CPU1",
+        "_RA_ORDINAL=2"
+      ],
+      "sourcePaths": [
+        "ra_gen",
+        "src",
+        "ra"
+      ],
+      "excludedFilePaths": [],
+      "includePaths": [
+        "ra_gen",
+        "ra_cfg/fsp_cfg/bsp",
+        "ra_cfg/fsp_cfg",
+        "src",
+        "ra/fsp/inc",
+        "ra/fsp/inc/api",
+        "ra/fsp/inc/instances",
+        "ra/arm/CMSIS_6/CMSIS/Core/Include"
+      ],
+      "libraryPaths": [],
+      "libraryNames": [],
+      "objectFiles": [],
+      "targetDeviceName": "R7KA8T2LFLCAB",
+      "buildConfigurationName": "Release",
+      "isPreBuildContentGenEnabled": false,
+      "isPostBuildContentGenEnabled": false,
+      "isTargetDeviceSupportsTrustZone": true,
+      "buildOptionsMap": {}
+    },
+    "Release": {
+      "definedMacros": [
+        "_RENESAS_RA_",
+        "_RA_CORE=CPU1",
+        "_RA_ORDINAL=2"
+      ],
+      "sourcePaths": [
+        "ra_gen",
+        "src",
+        "ra"
+      ],
+      "excludedFilePaths": [],
+      "includePaths": [
+        "ra_gen",
+        "ra_cfg/fsp_cfg/bsp",
+        "ra_cfg/fsp_cfg",
+        "src",
+        "ra/fsp/inc",
+        "ra/fsp/inc/api",
+        "ra/fsp/inc/instances",
+        "ra/arm/CMSIS_6/CMSIS/Core/Include"
+      ],
+      "libraryPaths": [],
+      "libraryNames": [],
+      "objectFiles": [],
+      "linkerScript": "script/fsp.ld",
+      "targetDeviceName": "R7KA8T2LFLCAB",
+      "entrySymbol": "Reset_Handler",
+      "buildConfigurationName": "Release",
+      "isPreBuildContentGenEnabled": false,
+      "isPostBuildContentGenEnabled": false,
+      "isTargetDeviceSupportsTrustZone": true,
+      "buildOptionsMap": {}
+    }
+  }
+}

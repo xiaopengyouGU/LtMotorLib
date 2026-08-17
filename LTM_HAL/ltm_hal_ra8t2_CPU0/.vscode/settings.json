@@ -1,0 +1,14 @@
+{
+    // 让 IntelliSense 忽略构建/发布产物目录，避免大文件导致 documentHighlight 超时失败
+    "C_Cpp.files.exclude": {
+        "**/build/**": true,
+        "**/bin/**": true,
+        "**/example/build/**": true
+    },
+    "C_Cpp.intelliSenseEngineFallback": "Enabled",
+    "C_Cpp.errorSquiggles": "Enabled",
+    "search.exclude": {
+        "**/build/**": true,
+        "**/bin/**": true
+    }
+}
