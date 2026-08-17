@@ -23,6 +23,8 @@ uint64_t ltm_sys_get_tick(void);                        /* 获取系统时基（
 uint64_t ltm_sys_get_ms(void);          
 uint64_t ltm_sys_get_us(void);          
 void     ltm_sys_set_callback(void (*callback)(void));  /* 设置 系统中断回调（1ms）*/
+void     ltm_sys_reset(void);
+                                   /* 系统软复位（SCB->AIRCR），复位后进 BootLoader 升级窗口 */
 
 /*==================== 延时 ====================*/
 void ltm_delay_ms(uint16_t ms);

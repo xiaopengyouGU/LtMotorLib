@@ -32,37 +32,11 @@ static uint8_t run_flag  = 0;             /* 运行标志 */
 /* CAN-FD 升级触发 ID：与 BootLoader 升级 ID 一致，上位机发该 ID 帧 → App 软复位进 BootLoader */
 #define APP_UPGRADE_TRIGGER_ID  0x7F0
 
-/* BootLoader 跳转标记：RAM 顶部保留字（与 BootLoader 约定一致，链接脚本已留 4 字节） */
-#define BL_JUMP_FLAG_ADDR   (0x22000000UL + 0xEA000UL - 4)   /* RAM 顶部 0x220E9FFC */
-#define BL_JUMP_MAGIC       0x4A554D50UL                     /* "JUMP" */
-
-/* 来自 BootLoader 跳转：恢复全局中断（跳转前被 __disable_irq 关闭，软跳转不复位 PRIMASK），
- * 并清标记只处理一次。必须在任何外设/中断使用之前调用。 */
-static void bl_commut_init(void)
-{
-    if (*(volatile uint32_t *)BL_JUMP_FLAG_ADDR == BL_JUMP_MAGIC) {
-        *(volatile uint32_t *)BL_JUMP_FLAG_ADDR = 0;      /* 清标记 */
-        __asm volatile ("cpsie i");                       /* PRIMASK=0，恢复中断 */
-    }
-}
-
-/* 系统软复位：写 SCB->AIRCR（VECTKEY + SYSRESETREQ），复位后 BootLoader 进入 6s 升级窗口。
- * 不依赖 CMSIS 头文件（example 编译路径未包含），直接操作寄存器。 */
-static void app_system_reset(void)
-{
-    __asm volatile ("dsb");
-    *(volatile uint32_t *)0xE000ED0C = 0x05FA0004UL;   /* SCB->AIRCR */
-    __asm volatile ("dsb");
-    while (1) { }
-}
-
 void user_func(uint8_t data_type, uint8_t *buf, uint16_t len);
 void user_canfd_rxcall(void);
 
 int main(void)
 {
-    bl_commut_init();       /* BootLoader 跳转恢复：必须先于任何外设/中断初始化 */
-
     /* 底层外设统一初始化（系统/延时/串口/CAN/LED/PWM/编码器/ADC） */
     ltm_hal_init();
 
@@ -192,7 +166,7 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
         case Data_CMD_Reset:
             /* 升级入口：软复位到 BootLoader（6s 窗口内上位机开始烧录） */
             ltm_commut_printf("Reset -> BootLoader\r\n");
-            app_system_reset();
+            ltm_sys_reset();
             break;
         case Data_CMD_Stop:
             run_flag = 0;
@@ -212,7 +186,7 @@ void user_canfd_rxcall(void)
     uint16_t id = 0, len = 0;
     uint8_t res = ltm_canfd_recv(&id, rx_buf, &len);
     if (id == APP_UPGRADE_TRIGGER_ID) {
-        app_system_reset();                 /* CAN-FD 升级触发：软复位进 BootLoader */
+        ltm_sys_reset();                 /* CAN-FD 升级触发：软复位进 BootLoader */
     }
     if(res == 1)      ltm_canfd_send(id, rx_buf, len);
     else if(res == 2) ltm_can_send(id, rx_buf, len);

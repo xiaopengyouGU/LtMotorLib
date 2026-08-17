@@ -18,9 +18,19 @@
 #include "bsp/encoder/encoder.h"
 #include "bsp/canfd/canfd.h"
 
+/* BootLoader 跳转标记：RAM 顶部保留字（与 BootLoader 约定一致，App 链接脚本已留 4 字节） */
+#define LTM_BL_JUMP_FLAG_ADDR   (0x22000000UL + 0xEA000UL - 4)   /* RAM 顶部 0x220E9FFC */
+#define LTM_BL_JUMP_MAGIC       0x4A554D50UL                     /* "JUMP" */
+
 /*==================== 总初始化（唯一 init 入口） ====================*/
 void ltm_hal_init(void)
 {
+    /* BootLoader 跳转恢复：软跳转不复位 PRIMASK，检测标记则恢复中断并清标记，必须先于任何外设/中断初始化 */
+    if (*(volatile uint32_t *)LTM_BL_JUMP_FLAG_ADDR == LTM_BL_JUMP_MAGIC) {
+        *(volatile uint32_t *)LTM_BL_JUMP_FLAG_ADDR = 0;
+        __asm volatile ("cpsie i");
+    }
+
     system_init();      /* 系统 */
     delay_init();       /* 延时 */
     uart_init();        /* 调试串口 */
@@ -36,6 +46,16 @@ uint64_t ltm_sys_get_tick(void)      { return system_get_tick(); }
 uint64_t ltm_sys_get_ms(void)        { return system_get_ms(); }
 uint64_t ltm_sys_get_us(void)        { return system_get_us(); }
 void ltm_sys_set_callback(void (*callback)(void)) { system_set_callback(callback); }
+
+/* 系统软复位：写 SCB->AIRCR（VECTKEY + SYSRESETREQ），复位后 BootLoader 进入升级窗口。
+ * 不依赖 CMSIS 头文件，直接操作寄存器（Cortex-M 通用）。 */
+void ltm_sys_reset(void)
+{
+    __asm volatile ("dsb");
+    *(volatile uint32_t *)0xE000ED0C = 0x05FA0004UL;   /* SCB->AIRCR */
+    __asm volatile ("dsb");
+    while (1) { }
+}
 
 /*==================== 延时 ====================*/
 void ltm_delay_ms(uint16_t ms)       { delay_ms(ms); }
