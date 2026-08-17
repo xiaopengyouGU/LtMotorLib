@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<azone>
+    <rzone name="R7KA8T2LFLCAB.rzone"/>
+    <partition>
+        <memory parent="RAM_NS" name="RAM_NS_CPU0_N" size="0x0" offset="0x1D4000" security="n" Pname="CPU0"/>
+        <memory parent="RAM_NS" name="RAM_NS_CPU1_N" size="0x0" offset="0x1D4000" security="n" Pname="CPU1"/>
+        <memory parent="RAM" name="RAM_CPU0_S" size="0xEA000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="RAM" name="RAM_CPU0_C" size="0x0" offset="0xEA000" security="c" Pname="CPU0"/>
+        <memory parent="RAM" name="RAM_CPU1_S" size="0xEA000" offset="0xEA000" security="s" Pname="CPU1"/>
+        <memory parent="RAM" name="RAM_CPU1_C" size="0x0" offset="0x1D4000" security="c" Pname="CPU1"/>
+        <memory parent="FLASH_NS" name="FLASH_NS_CPU0_N" size="0x0" offset="0x100000" security="n" Pname="CPU0"/>
+        <memory parent="FLASH_NS" name="FLASH_NS_CPU1_N" size="0x0" offset="0x100000" security="n" Pname="CPU1"/>
+        <memory parent="FLASH" name="FLASH_CPU0_S" size="0x80000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="FLASH" name="FLASH_CPU0_C" size="0x0" offset="0x80000" security="c" Pname="CPU0"/>
+        <memory parent="FLASH" name="FLASH_CPU1_S" size="0x80000" offset="0x80000" security="s" Pname="CPU1"/>
+        <memory parent="FLASH" name="FLASH_CPU1_C" size="0x0" offset="0x100000" security="c" Pname="CPU1"/>
+        <memory parent="DATA_FLASH_NS" name="DATA_FLASH_NS_CPU0_N" size="0x0" offset="0x0" security="n" Pname="CPU0"/>
+        <memory parent="DATA_FLASH_NS" name="DATA_FLASH_NS_CPU1_N" size="0x0" offset="0x0" security="n" Pname="CPU1"/>
+        <memory parent="DATA_FLASH" name="DATA_FLASH_CPU0_S" size="0x0" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="DATA_FLASH" name="DATA_FLASH_CPU1_S" size="0x0" offset="0x0" security="s" Pname="CPU1"/>
+        <memory parent="SDRAM" name="SDRAM_CPU0_S" size="0x4000000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="SDRAM" name="SDRAM_CPU1_S" size="0x4000000" offset="0x4000000" security="s" Pname="CPU1"/>
+        <memory parent="SDRAM" name="SDRAM_CPU0_N" size="0x0" offset="0x8000000" security="n" Pname="CPU0"/>
+        <memory parent="SDRAM" name="SDRAM_CPU1_N" size="0x0" offset="0x8000000" security="n" Pname="CPU1"/>
+        <memory parent="OSPI0_CS0" name="OSPI0_CS0_CPU0_S" size="0x8000000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OSPI0_CS0" name="OSPI0_CS0_CPU1_S" size="0x8000000" offset="0x8000000" security="s" Pname="CPU1"/>
+        <memory parent="OSPI0_CS0" name="OSPI0_CS0_CPU0_N" size="0x0" offset="0x10000000" security="n" Pname="CPU0"/>
+        <memory parent="OSPI0_CS0" name="OSPI0_CS0_CPU1_N" size="0x0" offset="0x10000000" security="n" Pname="CPU1"/>
+        <memory parent="OSPI0_CS1" name="OSPI0_CS1_CPU0_S" size="0x8000000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OSPI0_CS1" name="OSPI0_CS1_CPU1_S" size="0x8000000" offset="0x8000000" security="s" Pname="CPU1"/>
+        <memory parent="OSPI0_CS1" name="OSPI0_CS1_CPU0_N" size="0x0" offset="0x10000000" security="n" Pname="CPU0"/>
+        <memory parent="OSPI0_CS1" name="OSPI0_CS1_CPU1_N" size="0x0" offset="0x10000000" security="n" Pname="CPU1"/>
+        <memory parent="OSPI1_CS0" name="OSPI1_CS0_CPU0_S" size="0x4000000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OSPI1_CS0" name="OSPI1_CS0_CPU1_S" size="0x4000000" offset="0x4000000" security="s" Pname="CPU1"/>
+        <memory parent="OSPI1_CS0" name="OSPI1_CS0_CPU0_N" size="0x0" offset="0x8000000" security="n" Pname="CPU0"/>
+        <memory parent="OSPI1_CS0" name="OSPI1_CS0_CPU1_N" size="0x0" offset="0x8000000" security="n" Pname="CPU1"/>
+        <memory parent="OSPI1_CS1" name="OSPI1_CS1_CPU0_S" size="0x4000000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OSPI1_CS1" name="OSPI1_CS1_CPU1_S" size="0x4000000" offset="0x4000000" security="s" Pname="CPU1"/>
+        <memory parent="OSPI1_CS1" name="OSPI1_CS1_CPU0_N" size="0x0" offset="0x8000000" security="n" Pname="CPU0"/>
+        <memory parent="OSPI1_CS1" name="OSPI1_CS1_CPU1_N" size="0x0" offset="0x8000000" security="n" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS0" name="OPTION_SETTING_OFS0_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS0" name="OPTION_SETTING_OFS0_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS2" name="OPTION_SETTING_OFS2_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS2" name="OPTION_SETTING_OFS2_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_SAS" name="OPTION_SETTING_SAS_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_SAS" name="OPTION_SETTING_SAS_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS1" name="OPTION_SETTING_OFS1_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS1" name="OPTION_SETTING_OFS1_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS1" name="OPTION_SETTING_OFS1_CPU0_N" size="0x0" offset="0x4" security="n" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS1" name="OPTION_SETTING_OFS1_CPU1_N" size="0x0" offset="0x4" security="n" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS1_SEC" name="OPTION_SETTING_OFS1_SEC_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS1_SEC" name="OPTION_SETTING_OFS1_SEC_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS1_SEL" name="OPTION_SETTING_OFS1_SEL_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS1_SEL" name="OPTION_SETTING_OFS1_SEL_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS3" name="OPTION_SETTING_OFS3_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS3" name="OPTION_SETTING_OFS3_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS3" name="OPTION_SETTING_OFS3_CPU0_N" size="0x0" offset="0x4" security="n" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS3" name="OPTION_SETTING_OFS3_CPU1_N" size="0x0" offset="0x4" security="n" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS3_SEC" name="OPTION_SETTING_OFS3_SEC_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS3_SEC" name="OPTION_SETTING_OFS3_SEC_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OFS3_SEL" name="OPTION_SETTING_OFS3_SEL_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OFS3_SEL" name="OPTION_SETTING_OFS3_SEL_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_BPS" name="OPTION_SETTING_BPS_CPU0_S" size="0x40" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_BPS" name="OPTION_SETTING_BPS_CPU1_S" size="0x40" offset="0x40" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_BPS" name="OPTION_SETTING_BPS_CPU0_N" size="0x0" offset="0x80" security="n" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_BPS" name="OPTION_SETTING_BPS_CPU1_N" size="0x0" offset="0x80" security="n" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_BPS_SEC" name="OPTION_SETTING_BPS_SEC_CPU0_S" size="0x40" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_BPS_SEC" name="OPTION_SETTING_BPS_SEC_CPU1_S" size="0x40" offset="0x40" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL0" name="OPTION_SETTING_OTP_FSBLCTRL0_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL0" name="OPTION_SETTING_OTP_FSBLCTRL0_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL1" name="OPTION_SETTING_OTP_FSBLCTRL1_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL1" name="OPTION_SETTING_OTP_FSBLCTRL1_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL2" name="OPTION_SETTING_OTP_FSBLCTRL2_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_FSBLCTRL2" name="OPTION_SETTING_OTP_FSBLCTRL2_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SAMR" name="OPTION_SETTING_OTP_SAMR_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SAMR" name="OPTION_SETTING_OTP_SAMR_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC00" name="OPTION_SETTING_OTP_SACC00_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC00" name="OPTION_SETTING_OTP_SACC00_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC10" name="OPTION_SETTING_OTP_SACC10_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC10" name="OPTION_SETTING_OTP_SACC10_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC01" name="OPTION_SETTING_OTP_SACC01_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC01" name="OPTION_SETTING_OTP_SACC01_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC11" name="OPTION_SETTING_OTP_SACC11_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC11" name="OPTION_SETTING_OTP_SACC11_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC02" name="OPTION_SETTING_OTP_SACC02_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC02" name="OPTION_SETTING_OTP_SACC02_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC12" name="OPTION_SETTING_OTP_SACC12_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC12" name="OPTION_SETTING_OTP_SACC12_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC03" name="OPTION_SETTING_OTP_SACC03_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC03" name="OPTION_SETTING_OTP_SACC03_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_SACC13" name="OPTION_SETTING_OTP_SACC13_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_SACC13" name="OPTION_SETTING_OTP_SACC13_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS_SEC" name="OPTION_SETTING_OTP_PBPS_SEC_CPU0_S" size="0x40" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS_SEC" name="OPTION_SETTING_OTP_PBPS_SEC_CPU1_S" size="0x40" offset="0x40" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS" name="OPTION_SETTING_OTP_PBPS_CPU0_S" size="0x40" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS" name="OPTION_SETTING_OTP_PBPS_CPU1_S" size="0x40" offset="0x40" security="s" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS" name="OPTION_SETTING_OTP_PBPS_CPU0_N" size="0x0" offset="0x80" security="n" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_PBPS" name="OPTION_SETTING_OTP_PBPS_CPU1_N" size="0x0" offset="0x80" security="n" Pname="CPU1"/>
+        <memory parent="OPTION_SETTING_OTP_ZHUK" name="OPTION_SETTING_OTP_ZHUK_CPU0_S" size="0x2" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="OPTION_SETTING_OTP_ZHUK" name="OPTION_SETTING_OTP_ZHUK_CPU1_S" size="0x2" offset="0x2" security="s" Pname="CPU1"/>
+        <memory parent="ITCM_NS" name="ITCM_NS_CPU0_N" size="0x0" offset="0x20000" security="n" Pname="CPU0"/>
+        <memory parent="ITCM" name="ITCM_CPU0_S" size="0x20000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="DTCM_NS" name="DTCM_NS_CPU0_N" size="0x0" offset="0x20000" security="n" Pname="CPU0"/>
+        <memory parent="DTCM" name="DTCM_CPU0_S" size="0x20000" offset="0x0" security="s" Pname="CPU0"/>
+        <memory parent="CTCM_NS" name="CTCM_NS_CPU1_N" size="0x0" offset="0x10000" security="n" Pname="CPU1"/>
+        <memory parent="CTCM" name="CTCM_CPU1_S" size="0x10000" offset="0x0" security="s" Pname="CPU1"/>
+        <memory parent="STCM_NS" name="STCM_NS_CPU1_N" size="0x0" offset="0x10000" security="n" Pname="CPU1"/>
+        <memory parent="STCM" name="STCM_CPU1_S" size="0x10000" offset="0x0" security="s" Pname="CPU1"/>
+        <peripheral name="PORT0.CPU0" group="PORT">
+            <slot name="P000.CPU0" secure="true"/>
+            <slot name="P002.CPU0" secure="true"/>
+            <slot name="P004.CPU0" secure="true"/>
+            <slot name="P006.CPU0" secure="true"/>
+            <slot name="P007.CPU0" secure="true"/>
+            <slot name="P008.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="PORT1.CPU0" group="PORT">
+            <slot name="P100.CPU0" secure="true"/>
+            <slot name="P101.CPU0" secure="true"/>
+            <slot name="P102.CPU0" secure="true"/>
+            <slot name="P115.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="PORT2.CPU0" group="PORT">
+            <slot name="P202.CPU0" secure="true"/>
+            <slot name="P203.CPU0" secure="true"/>
+            <slot name="P204.CPU0" secure="true"/>
+            <slot name="P205.CPU0" secure="true"/>
+            <slot name="P208.CPU0" secure="true"/>
+            <slot name="P209.CPU0" secure="true"/>
+            <slot name="P210.CPU0" secure="true"/>
+            <slot name="P211.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="PORT3.CPU0" group="PORT">
+            <slot name="P301.CPU0" secure="true"/>
+            <slot name="P308.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="PORT6.CPU0" group="PORT">
+            <slot name="P600.CPU0" secure="true"/>
+            <slot name="P601.CPU0" secure="true"/>
+            <slot name="P609.CPU0" secure="true"/>
+            <slot name="P610.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="PORT9.CPU0" group="PORT">
+            <slot name="P902.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="GPT4.CPU0" group="GPT" security="s"/>
+        <peripheral name="GPT5.CPU0" group="GPT" security="s"/>
+        <peripheral name="GPT6.CPU0" group="GPT" security="s"/>
+        <peripheral name="DMA_DMAC0.CPU0" group="DMA_DMAC" security="s"/>
+        <peripheral name="DMA_DMAC3.CPU0" group="DMA_DMAC" security="s"/>
+        <peripheral name="GPT0.CPU0" group="GPT" security="s"/>
+        <peripheral name="DMA_DMAC1.CPU0" group="DMA_DMAC" security="s"/>
+        <peripheral name="DMA_DMAC2.CPU0" group="DMA_DMAC" security="s"/>
+        <peripheral name="ICU.CPU0">
+            <slot name="IRQ0.CPU0" secure="true"/>
+            <slot name="IRQ1.CPU0" secure="true"/>
+            <slot name="IRQ2.CPU0" secure="true"/>
+            <slot name="IRQ3.CPU0" secure="true"/>
+            <slot name="IRQ4.CPU0" secure="true"/>
+            <slot name="IRQ5.CPU0" secure="true"/>
+            <slot name="IRQ6.CPU0" secure="true"/>
+            <slot name="IRQ7.CPU0" secure="true"/>
+            <slot name="IRQ8.CPU0" secure="true"/>
+            <slot name="IRQ9.CPU0" secure="true"/>
+            <slot name="IRQ10.CPU0" secure="true"/>
+            <slot name="IRQ11.CPU0" secure="true"/>
+            <slot name="IRQ12.CPU0" secure="true"/>
+            <slot name="IRQ13.CPU0" secure="true"/>
+            <slot name="IRQ14.CPU0" secure="true"/>
+            <slot name="IRQ15.CPU0" secure="true"/>
+            <slot name="IRQ16.CPU0" secure="true"/>
+            <slot name="IRQ17.CPU0" secure="true"/>
+            <slot name="IRQ18.CPU0" secure="true"/>
+            <slot name="IRQ19.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="ELC.CPU0">
+            <slot name="ADC0.CPU0" secure="true"/>
+            <slot name="ADC1.CPU0" secure="true"/>
+        </peripheral>
+        <peripheral name="ICU.CPU1">
+            <slot name="IRQ0.CPU1" secure="true"/>
+            <slot name="IRQ1.CPU1" secure="true"/>
+        </peripheral>
+    </partition>
+    <zones>
+        <zone name="CPU0_S" Pname="CPU0" security="s">
+            <assign memory="RAM_CPU0_S"/>
+            <assign memory="RAM_CPU0_C"/>
+            <assign memory="FLASH_CPU0_S"/>
+            <assign memory="FLASH_CPU0_C"/>
+            <assign memory="DATA_FLASH_CPU0_S"/>
+            <assign memory="SDRAM_CPU0_S"/>
+            <assign memory="OSPI0_CS0_CPU0_S"/>
+            <assign memory="OSPI0_CS1_CPU0_S"/>
+            <assign memory="OSPI1_CS0_CPU0_S"/>
+            <assign memory="OSPI1_CS1_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS0_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS2_CPU0_S"/>
+            <assign memory="OPTION_SETTING_SAS_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS1_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS1_SEC_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS1_SEL_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS3_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS3_SEC_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OFS3_SEL_CPU0_S"/>
+            <assign memory="OPTION_SETTING_BPS_CPU0_S"/>
+            <assign memory="OPTION_SETTING_BPS_SEC_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_FSBLCTRL0_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_FSBLCTRL1_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_FSBLCTRL2_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SAMR_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC00_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC10_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC01_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC11_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC02_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC12_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC03_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_SACC13_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_PBPS_SEC_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_PBPS_CPU0_S"/>
+            <assign memory="OPTION_SETTING_OTP_ZHUK_CPU0_S"/>
+            <assign memory="ITCM_CPU0_S"/>
+            <assign memory="DTCM_CPU0_S"/>
+            <assign group="PORT" peripheral="PORT0.P000"/>
+            <assign group="PORT" peripheral="PORT0.P002"/>
+            <assign group="PORT" peripheral="PORT0.P004"/>
+            <assign group="PORT" peripheral="PORT0.P006"/>
+            <assign group="PORT" peripheral="PORT0.P007"/>
+            <assign group="PORT" peripheral="PORT0.P008"/>
+            <assign group="PORT" peripheral="PORT1.P100"/>
+            <assign group="PORT" peripheral="PORT1.P101"/>
+            <assign group="PORT" peripheral="PORT1.P102"/>
+            <assign group="PORT" peripheral="PORT1.P115"/>
+            <assign group="PORT" peripheral="PORT2.P202"/>
+            <assign group="PORT" peripheral="PORT2.P203"/>
+            <assign group="PORT" peripheral="PORT2.P204"/>
+            <assign group="PORT" peripheral="PORT2.P205"/>
+            <assign group="PORT" peripheral="PORT2.P208"/>
+            <assign group="PORT" peripheral="PORT2.P209"/>
+            <assign group="PORT" peripheral="PORT2.P210"/>
+            <assign group="PORT" peripheral="PORT2.P211"/>
+            <assign group="PORT" peripheral="PORT3.P301"/>
+            <assign group="PORT" peripheral="PORT3.P308"/>
+            <assign group="PORT" peripheral="PORT6.P600"/>
+            <assign group="PORT" peripheral="PORT6.P601"/>
+            <assign group="PORT" peripheral="PORT6.P609"/>
+            <assign group="PORT" peripheral="PORT6.P610"/>
+            <assign group="PORT" peripheral="PORT9.P902"/>
+            <assign group="GPT" peripheral="GPT4"/>
+            <assign group="GPT" peripheral="GPT5"/>
+            <assign group="GPT" peripheral="GPT6"/>
+            <assign group="DMA_DMAC" peripheral="DMA_DMAC0"/>
+            <assign group="DMA_DMAC" peripheral="DMA_DMAC3"/>
+            <assign group="GPT" peripheral="GPT0"/>
+            <assign group="DMA_DMAC" peripheral="DMA_DMAC1"/>
+            <assign group="DMA_DMAC" peripheral="DMA_DMAC2"/>
+            <assign peripheral="ICU.IRQ0"/>
+            <assign peripheral="ICU.IRQ1"/>
+            <assign peripheral="ICU.IRQ2"/>
+            <assign peripheral="ICU.IRQ3"/>
+            <assign peripheral="ICU.IRQ4"/>
+            <assign peripheral="ICU.IRQ5"/>
+            <assign peripheral="ICU.IRQ6"/>
+            <assign peripheral="ICU.IRQ7"/>
+            <assign peripheral="ICU.IRQ8"/>
+            <assign peripheral="ICU.IRQ9"/>
+            <assign peripheral="ICU.IRQ10"/>
+            <assign peripheral="ICU.IRQ11"/>
+            <assign peripheral="ICU.IRQ12"/>
+            <assign peripheral="ICU.IRQ13"/>
+            <assign peripheral="ICU.IRQ14"/>
+            <assign peripheral="ICU.IRQ15"/>
+            <assign peripheral="ICU.IRQ16"/>
+            <assign peripheral="ICU.IRQ17"/>
+            <assign peripheral="ICU.IRQ18"/>
+            <assign peripheral="ICU.IRQ19"/>
+            <assign peripheral="ELC.ADC0"/>
+            <assign peripheral="ELC.ADC1"/>
+        </zone>
+    </zones>
+</azone>
