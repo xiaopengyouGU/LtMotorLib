@@ -1,0 +1,9 @@
+# 构建产物
+build/
+build_*/
+__pycache__/
+*.pyc
+
+# 编辑器临时文件
+*.swp
+*.bak
