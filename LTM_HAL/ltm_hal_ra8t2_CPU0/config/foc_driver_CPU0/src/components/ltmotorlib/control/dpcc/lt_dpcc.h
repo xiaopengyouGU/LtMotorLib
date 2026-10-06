@@ -12,7 +12,7 @@ void lt_dpcc_init(float Ls, float Rs, float phi, float dt);
 void lt_dpcc_set(float eso_width, float out_limit);
 void lt_dpcc_set_target(float id_ref, float iq_ref);    /* 设置电流目标值 */
 void lt_dpcc_reset(void);                               /* 重置 ESO 状态 */   
-void lt_dpcc_process(float id, float iq, float we);     /* id, iq (A), we : 电角速度 (rad/s) */
+void lt_dpcc_process(float id, float iq, float we, float vbus);     /* id, iq (A), we : 电角速度 (rad/s), vbus : 母线电压（V）*/
 void lt_dpcc_get(float *ud, float *uq);                 /* 获取输出DQ轴电压 */
 
 #endif

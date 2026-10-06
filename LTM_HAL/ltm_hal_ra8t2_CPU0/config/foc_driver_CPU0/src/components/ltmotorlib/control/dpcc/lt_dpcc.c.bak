@@ -6,11 +6,10 @@
 /* ============================================================================
  * 内部 ESO 接口声明（实现在文件末尾）
  * ============================================================================*/
-static void lt_eso_init(float Ls, float Rs, float phi, float dt, float wb);
+static void lt_eso_init(float Ls, float dt, float wb);
 static void lt_eso_reset(void);
 static void lt_eso_process(float ud, float uq, float id, float iq, float we);
 static void lt_eso_get(float *vd_dist, float *vq_dist);   /* 获取 ESO估计的 电压扰动 */
-static void lt_eso_get_fb(float *id_fb, float *iq_fb);   /* 获取 ESO一步预测电流 */
 
 /* ============================================================================
  * DPCC 主模块
@@ -53,7 +52,7 @@ void lt_dpcc_init(float Ls, float Rs, float phi, float dt)
     dpcc->out_limit = 12.0f;
     dpcc->id_ref = 0.0f;
 
-    lt_eso_init(Ls, Rs, phi, dt, 0.0f);
+    lt_eso_init(Ls, dt, 0.0f);
 }
 
 void lt_dpcc_set(float eso_width, float out_limit)
@@ -63,7 +62,7 @@ void lt_dpcc_set(float eso_width, float out_limit)
         dpcc->out_limit = out_limit;
     }
 
-    lt_eso_init(dpcc->Ls, dpcc->Rs, dpcc->phi, dpcc->dt, eso_width);
+    lt_eso_init(dpcc->Ls, dpcc->dt, eso_width);
     if (eso_width <= 0.0f) {
         lt_eso_reset();
     }
@@ -84,7 +83,7 @@ void lt_dpcc_reset(void)
     lt_eso_reset();
 }
 
-void lt_dpcc_process(float id, float iq, float we, float vbus)
+void lt_dpcc_process(float id, float iq, float we)
 {
     float L_over_dt = dpcc->Ls_over_dt;     /* Ls/dt */
     float L  = dpcc->Ls;
@@ -93,35 +92,21 @@ void lt_dpcc_process(float id, float iq, float we, float vbus)
     float id_ref = dpcc->id_ref;
     float iq_ref = dpcc->iq_ref;
     float limit  = dpcc->out_limit;
-    /* 母线电压实时限幅：SVPWM 线性区上限 Vbus/√3，0.9 裕量；vbus<=0 时回退配置值 */
-    if (vbus > 0.0f) {
-        float vbus_limit = 0.9f * vbus * _SQRT_3_INV;
-        if (vbus_limit < limit) {
-            limit = vbus_limit;
-        }
-    }
     float vd_eso, vq_eso;
 
     /* ESO 更新 */
     lt_eso_process(dpcc->ud_prev, dpcc->uq_prev, id, iq, we);
     lt_eso_get(&vd_eso, &vq_eso);
 
-    /* 一拍传输延迟补偿：ESO 开启时用一步预测电流 i_hat[k+1] 做反馈 */
-    float id_fb = id;
-    float iq_fb = iq;
-    if (dpcc->eso_width > 0.0f) {
-        lt_eso_get_fb(&id_fb, &iq_fb);
-    }
-
     /* DPCC 无差拍计算，最后减去 ESO 估计的扰动值 */
-    float ud_raw = L_over_dt * (id_ref - id_fb)
-                 + R * id_fb
-                 - we * L * iq_fb
+    float ud_raw = L_over_dt * (id_ref - id)
+                 + R * id
+                 - we * L * iq
                  - vd_eso;
 
-    float uq_raw = L_over_dt * (iq_ref - iq_fb)
-                 + R * iq_fb
-                 + we * L * id_fb
+    float uq_raw = L_over_dt * (iq_ref - iq)
+                 + R * iq
+                 + we * L * id
                  + we * phi
                  - vq_eso;
 
@@ -151,8 +136,6 @@ void lt_dpcc_get(float *ud, float *uq)
  * ============================================================================*/
 typedef struct {
     float Ls;           /* 相电感 (H) */
-    float Rs;           /* 相电阻 (Ω) */
-    float phi;          /* 永磁体磁链 (Wb) */
     float dt;           /* 控制周期 (s) */
     float wb;           /* 观测器带宽 (rad/s)，<= 0 时禁用 */
 
@@ -162,7 +145,6 @@ typedef struct {
     float fq_hat;       /* q 轴扰动估计 (A/s) */
 
     float ts_over_L;    /* dt / Ls，预计算 */
-    float rs_ts_over_L; /* Rs*dt/Ls，预计算 */
     float l1_dt, l2_dt; /* 观测器增益：l1 = 3*wb, l2 = 3*wb² ，此处直接乘上dt，提高计算效率 */
     float vd_dist;      /* d 轴等效电压扰动 (V) = fd_hat * Ls */
     float vq_dist;      /* q 轴等效电压扰动 (V) = fq_hat * Ls */
@@ -172,16 +154,13 @@ typedef struct {
 static lt_eso_obj eso_obj;
 static lt_eso_obj *eso = &eso_obj;
 
-static void lt_eso_init(float Ls, float Rs, float phi, float dt, float wb)
+static void lt_eso_init(float Ls, float dt, float wb)
 {
     memset(eso, 0, sizeof(lt_eso_obj));
 
     eso->Ls = Ls;
-    eso->Rs = Rs;
-    eso->phi = phi;
     eso->dt = dt;
     eso->ts_over_L = dt / Ls;
-    eso->rs_ts_over_L = Rs * dt / Ls;
     eso->wb = wb;
 
     if (wb > 0.0f) {
@@ -219,32 +198,24 @@ static void lt_eso_process(float ud, float uq, float id, float iq, float we)
     float dt = eso->dt;
     float Ls = eso->Ls;
     float ts_over_L = eso->ts_over_L;
-    float rs_ts_over_L = eso->rs_ts_over_L;  /* Rs*dt/Ls，预计算 */
-    float phi = eso->phi;
     float l1_dt = eso->l1_dt;       /* l1 * dt */
     float l2_dt = eso->l2_dt;       /* l2 * dt */
 
-    /* 标称模型(R、ωL、ωψ)显式建模，f 仅估计残差扰动 (A/s) */
     /* d 轴：电流估计 + 扰动估计 */
     float fd_hat = eso->fd_hat;          
     float eps_d  = id - eso->id_hat;
-    float id_hat_next = ts_over_L * ud
-                      - rs_ts_over_L * id
+    float id_hat_next = ts_over_L * (ud + fd_hat)
                       + id
                       + dt * we * iq
-                      + dt * fd_hat
                       + l1_dt * eps_d;
     float fd_hat_next = fd_hat + l2_dt * eps_d;
 
     /* q 轴：电流估计 + 扰动估计 */
     float fq_hat = eso->fq_hat;
     float eps_q  = iq - eso->iq_hat;
-    float iq_hat_next = ts_over_L * uq
-                      - rs_ts_over_L * iq
-                      - ts_over_L * we * phi
+    float iq_hat_next = ts_over_L * (uq + fq_hat)
                       + iq
                       - dt * we * id
-                      + dt * fq_hat
                       + l1_dt * eps_q;
     float fq_hat_next = fq_hat + l2_dt * eps_q ;
 
@@ -262,10 +233,4 @@ static void lt_eso_get(float *vd_dist, float *vq_dist)
 {
     if (vd_dist) *vd_dist = eso->vd_dist;
     if (vq_dist) *vq_dist = eso->vq_dist;
-}
-
-static void lt_eso_get_fb(float *id_fb, float *iq_fb)
-{
-    if (id_fb) *id_fb = eso->id_hat;
-    if (iq_fb) *iq_fb = eso->iq_hat;
 }
