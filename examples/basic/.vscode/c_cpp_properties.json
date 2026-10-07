@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "RISC-V-HPM6E8Y-LTM_FOC-Basic",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/lib/**"
+            ],
+            "defines": [],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/RISC-V_GUN_Tool_Chain/rv32imac_zicsr_zifencei_multilib_b_ext-win/bin/riscv32-unknown-elf-gcc.exe",
+            "cStandard": "gnu99",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}
