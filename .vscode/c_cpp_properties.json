@@ -1,0 +1,62 @@
+{
+    // ============ LTM_FOC 树内 IntelliSense ============
+    // 与构建一致：examples/basic(app) -> LTM_FOC(胶水层) -> LTM_CTRL(算法库) + LTM_HAL(预编译 SDK)
+    // 宏与 include 全部对齐 CMake：boards/ra6m4/board.cmake + 各 CMakeLists.txt
+    "version": 4,
+    "configurations": [
+        {
+            "name": "RA6M4 (ARM)",
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "compilerArgs": [
+                "-mthumb",
+                "-march=armv7e-m",
+                "-mfpu=fpv4-sp-d16",
+                "-mfloat-abi=hard"
+            ],
+            "intelliSenseMode": "windows-gcc-arm",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "includePath": [
+                /* ---- 例程 ---- */
+                "${workspaceFolder}/examples/basic/src",
+                /* ---- 胶水层：源码 + 交付单头(ltm_foc/lt_motor.h) ---- */
+                "${workspaceFolder}/LTM_FOC/src",
+                "${workspaceFolder}/LTM_FOC/bin",
+                /* ---- 算法库：源码(库内相对包含) + 交付聚合头(ltm_ctrl/lt_*.h) ---- */
+                "${workspaceFolder}/LTM_CTRL/src",
+                "${workspaceFolder}/LTM_CTRL/bin/arm",
+                /* ---- HAL 交付头(ltm_hal/ltm_hal.h) ---- */
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/bin",
+                /* ---- 板级参数：LTM_FOC_PARAM_H 指向这里的 user_param_def.h ---- */
+                "${workspaceFolder}/boards/ra6m4",
+                /* ---- 以下只在改 HAL 源码时需要 ---- */
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/src/components",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/src/drivers",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra_gen",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra_cfg/fsp_cfg",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/inc",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/inc/api",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/inc/instances"
+            ],
+            "defines": [
+                /* 板级 MCU 定义（board.cmake 的 LTM_BOARD_DEFINES）*/
+                "_RENESAS_RA_",
+                "_RA_CORE=CM33",
+                "_RA_ORDINAL=1",
+                /* 机型参数：构建里是绝对路径，这里用相对名 + boards/ra6m4 已在 includePath */
+                "LTM_FOC_PARAM_H=\"user_param_def.h\"",
+                "LTMFOC_VERSION_STRING=\"1.0.0\"",
+                "LTMCTRL_VERSION_STRING=\"1.0.1\""
+            ],
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/examples/basic/src",
+                    "${workspaceFolder}/LTM_FOC/src",
+                    "${workspaceFolder}/LTM_CTRL/src",
+                    "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/src"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ]
+}
