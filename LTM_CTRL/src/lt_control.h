@@ -12,7 +12,7 @@
  * Ki·ts / Kd·freq，故换调用频率不用重算增益。idx 是静态池下标（0 ~ 上限-1）。
  * Q24 实例误差 target-curr 按 ±2^30 饱和；输出限幅默认给满量程，可 set_limits 改。
  *
- *     lt_pid_init(2, 0, 20000);                 // Q15 信号，20kHz
+ *     lt_pid_init(2, 20000);                    // 20kHz 调用
  *     lt_pid_set(2, Kp, Ki, Kd);                // Q15.15 增益
  *     lt_pid_set_limits(2, out_max, out_min);   // 可非对称
  *     out = lt_pi_update(2, curr);              // 每拍调用
@@ -22,7 +22,7 @@
 #define LT_PID_MAX_INSTANCES    4       /* 提供的 PID 实例数，索引 0-3 */
 #endif
 
-uint8_t lt_pid_init(uint8_t idx, uint8_t type, uint32_t freq);   /* 信号格式（type）=> 0：Q15，1：Q24 */
+uint8_t lt_pid_init(uint8_t idx, uint32_t freq);
 
 void    lt_pid_reset(uint8_t idx);
 void    lt_pid_set(uint8_t idx, int32_t Kp, int32_t Ki, int32_t Kd);
