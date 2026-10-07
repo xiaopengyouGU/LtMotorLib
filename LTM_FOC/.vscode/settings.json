@@ -1,0 +1,14 @@
+{
+    "C_Cpp.files.exclude": {
+        "**/build/**": true,
+        "**/build_arm/**": true
+    },
+    "C_Cpp.errorSquiggles": "Enabled",
+    "search.exclude": {
+        "**/build/**": true,
+        "**/build_arm/**": true
+    },
+    "files.associations": {
+        "*.h": "c"
+    }
+}

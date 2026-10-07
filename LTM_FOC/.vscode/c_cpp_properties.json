@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-RA6M4-LTM_FOC",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/examples/basic/src",
+                "${workspaceFolder}/examples/basic/lib",
+                "${workspaceFolder}/examples/canfd/src",
+                "${workspaceFolder}/examples/canfd/lib",
+                "D:/Develop/LtMotorLib/LTM_HAL/ltm_hal_ra6m4/bin",
+                "D:/Develop/LtMotorLib/LTM_CTRL/bin"
+            ],
+            "defines": [],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu99",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}
