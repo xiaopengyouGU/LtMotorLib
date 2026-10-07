@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-GCC-RA6M4",
+            "includePath": [
+                "${workspaceFolder}/src/components",
+                "${workspaceFolder}/src/drivers",
+                "${workspaceFolder}/config/foc_driver",
+                "${workspaceFolder}/config/foc_driver/ra_gen",
+                "${workspaceFolder}/config/foc_driver/ra/fsp/inc",
+                "${workspaceFolder}/config/foc_driver/ra/fsp/inc/api",
+                "${workspaceFolder}/config/foc_driver/ra/fsp/inc/instances",
+                "${workspaceFolder}/config/foc_driver/ra_cfg/fsp_cfg",
+                "${workspaceFolder}/config/foc_driver/ra_cfg/fsp_cfg/bsp",
+                "${workspaceFolder}/config/foc_driver/ra/arm/CMSIS_6/CMSIS/Core/Include",
+                "${workspaceFolder}/config/foc_driver/ra/fsp/src/bsp/cmsis/Device/RENESAS/Include"
+            ],
+            "defines": [
+                "_RENESAS_RA_",
+                "_RA_CORE=CM33",
+                "_RA_ORDINAL=1"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}
