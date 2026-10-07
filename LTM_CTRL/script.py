@@ -20,11 +20,11 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 GENERATOR = "MinGW Makefiles"
 PLATFORMS = ("arm", "riscv", "pc")
 TOOLCHAINS = {
-    "arm":   os.path.join(ROOT, "cmake", "toolchain_arm.cmake"),
-    "riscv": os.path.join(ROOT, "cmake", "toolchain_riscv.cmake"),
-    "pc":    os.path.join(ROOT, "cmake", "toolchain.cmake"),
+    "arm":   os.path.join(ROOT, "../cmake", "toolchain_arm.cmake"),
+    "riscv": os.path.join(ROOT, "../cmake", "toolchain_riscv.cmake"),
+    "pc":    os.path.join(ROOT, "../cmake", "toolchain.cmake"),
 }
-EXAMPLE = os.path.join(ROOT, "example")
+EXAMPLE = os.path.join(ROOT, "examples")
 EX_BUILD = os.path.join(EXAMPLE, "build")
 EX_EXE = os.path.join(EX_BUILD, "sim.exe")
 STRESS_EXE = os.path.join(EX_BUILD, "speed_stress.exe")
@@ -79,7 +79,7 @@ def run_example():
 
 
 def build_stress():
-    """构建压测目标（example 工程）"""
+    """构建压测目标（examples 工程）"""
     ensure_cache(EX_BUILD, EXAMPLE)
     return (run(["cmake", "-G", GENERATOR, "-B", EX_BUILD, "-S", EXAMPLE, "-DCMAKE_BUILD_TYPE=Release"])
             and run(["cmake", "--build", EX_BUILD, "--target", "speed_stress"]))

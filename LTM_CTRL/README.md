@@ -21,7 +21,7 @@ LTM_CTRL/
 │   ├─ math/                   基础数学、相干解调、插值、最小二乘
 │   ├─ control/                纯定点：FOC、PID、PDOB、S 曲线、测速、死区补偿、陷波
 │   └─ analysis/               参数校准、辨识、扫频测量、激励信号
-├─ example/                    PC 仿真示例
+├─ examples/                   PC 仿真示例
 ├─ build/<platform>/           构建目录，`-c` 清理
 └─ bin/<platform>/             交付产物
 ```
@@ -85,7 +85,7 @@ python script.py -s arm          只构建指定平台，可给多个
 python script.py -e              构建并运行 PC 闭环仿真
 python script.py -t              构建并运行 lt_speed 压测
 python script.py -b              -s 全部 + PC 仿真
-python script.py -c              删除 build/ 与 example/build
+python script.py -c              删除 build/ 与 examples/build
 ```
 
 产物布局，三个平台结构一致：
