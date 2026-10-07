@@ -3,6 +3,18 @@ build/
 build_*/
 __pycache__/
 *.pyc
+*.o
+*.obj
+*.map
+
+# 示例/应用的编译输出
+examples/*/bin/
+
+# 预编译交付库：暂不入库（需要时用 git add -f 强制添加）
+LTM_CTRL/bin/**/*.a
+LTM_FOC/bin/**/*.a
+LTM_HAL/*/bin/**/*.a
+LTM_HAL/*/examples/*/lib/*.a
 
 # 编辑器临时文件
 *.swp
