@@ -1,4 +1,4 @@
-# 鏋勫缓浜х墿
+# build artifacts
 build/
 build_*/
 __pycache__/
@@ -7,13 +7,15 @@ __pycache__/
 *.obj
 *.map
 
-# 绀轰緥/搴旂敤鐨勭紪璇戣緭鍑?examples/*/bin/
+# example / app build output
+examples/*/bin/
 
-# 棰勭紪璇戜氦浠樺簱锛氭殏涓嶅叆搴擄紙闇€瑕佹椂鐢?git add -f 寮哄埗娣诲姞锛?LTM_CTRL/bin/**/*.a
+# prebuilt delivery libs: keep out of git for now (force add with: git add -f)
+LTM_CTRL/bin/**/*.a
 LTM_FOC/bin/**/*.a
 LTM_HAL/*/bin/**/*.a
-LTM_HAL/*/examples/*/lib/*.a
+LTM_HAL/**/lib/*.a
 
-# 缂栬緫鍣ㄤ复鏃舵枃浠?*.swp
+# editor temp files
+*.swp
 *.bak
-LTM_HAL/examples/*/lib/*.a
