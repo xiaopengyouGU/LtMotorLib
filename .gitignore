@@ -1,4 +1,4 @@
-# 构建产物
+# 鏋勫缓浜х墿
 build/
 build_*/
 __pycache__/
@@ -7,15 +7,13 @@ __pycache__/
 *.obj
 *.map
 
-# 示例/应用的编译输出
-examples/*/bin/
+# 绀轰緥/搴旂敤鐨勭紪璇戣緭鍑?examples/*/bin/
 
-# 预编译交付库：暂不入库（需要时用 git add -f 强制添加）
-LTM_CTRL/bin/**/*.a
+# 棰勭紪璇戜氦浠樺簱锛氭殏涓嶅叆搴擄紙闇€瑕佹椂鐢?git add -f 寮哄埗娣诲姞锛?LTM_CTRL/bin/**/*.a
 LTM_FOC/bin/**/*.a
 LTM_HAL/*/bin/**/*.a
 LTM_HAL/*/examples/*/lib/*.a
 
-# 编辑器临时文件
-*.swp
+# 缂栬緫鍣ㄤ复鏃舵枃浠?*.swp
 *.bak
+LTM_HAL/examples/*/lib/*.a
