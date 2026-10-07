@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  * lt_speed 主机侧压测（PC，无硬件依赖）
  *
  * 配置：25 kHz 采样、18 位单圈编码器，与 lt_speed_init(262144, 25000) 对应。

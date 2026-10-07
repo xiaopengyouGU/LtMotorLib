@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  * LTM_CTRL 闭环仿真示例（PC，无硬件依赖）
  *
  * 与固件控制任务同构：25 kHz 电流环（测速 + FOC），速度环 5 kHz 分频调用。
