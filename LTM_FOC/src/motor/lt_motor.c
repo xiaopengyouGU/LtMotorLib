@@ -114,7 +114,6 @@ lt_err_t lt_motor_run(void)              /* 电机启动 */
 lt_err_t lt_motor_stop(uint8_t estop)    /* 电机停机：0 受控（25pu/s），1 急停（100pu/s）*/
 {
     if (lt_fsm_get() == State_Running) {
-        lt_fsm_update(Event_Stop);       /* 非运行状态：直接停机 */
         control_tasks_stop(estop);       /* 异步：返回时还在减速，看 info.state 判定停完 */
     }
     return lt_fsm_get() == State_Error ? LT_ERR_STATE : LT_OK;

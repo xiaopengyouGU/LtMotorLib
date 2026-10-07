@@ -136,8 +136,8 @@ static void user_help(void)
                       "  V=<RPM>   speed mode\r\n"
                       "  RV=<RPM>  ramp speed mode\r\n");
     ltm_commut_printf("  P=<deg>   position mode\r\n"
-                      "  S         controlled stop (25 pu/s)\r\n"
-                      "  ES        emergency stop (100 pu/s)\r\n"
+                      "  S         controlled stop (1500 RPM/s)\r\n"
+                      "  ES        emergency stop (6000 RPM/s)\r\n"
                       "  H / ?     this help\r\n");
 }
 
@@ -165,12 +165,12 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
                 user_help();
             } else if (len >= 3 && buf[0] == 'R' && buf[1] == 'V' && buf[2] == '=') {
                 user_set_mode(buf + 1, (uint16_t)(len - 1), Mode_Ramp_Speed, "Ramp speed");
-            } else if (len >= 2 && buf[0] == 'E' && buf[1] == 'S') {   /* 急停：100 pu/s */
+            } else if (len >= 2 && buf[0] == 'E' && buf[1] == 'S') {   /* 急停 */
                 lt_motor_stop(1);
-                ltm_commut_printf("E-Stop (100 pu/s)\r\n");
-            } else if (len >= 1 && buf[0] == 'S') {                    /* 受控停机：25 pu/s */
+                ltm_commut_printf("E-Stop (6000 RPM/s)\r\n");
+            } else if (len >= 1 && buf[0] == 'S') {                    /* 受控停机 */
                 lt_motor_stop(0);
-                ltm_commut_printf("Stop (25 pu/s)\r\n");
+                ltm_commut_printf("Stop (1500 RPM/s)\r\n");
             } else if (len >= 2 && buf[1] == '=') {
                 switch (buf[0]) {
                     case 'T': user_set_mode(buf, len, Mode_Torque, "Torque Iq"); break;

@@ -36,6 +36,7 @@ typedef struct {
     uint8_t      scurve_ready;              /* 位置规划器已启动 */
     uint8_t      in_pos;                    /* 位置到位指示 */
     int32_t      ph_i_q15[3];               /* 本拍三相电流，死区补偿用 */
+    int32_t      id_flt, iq_flt;            /* 电流反馈滤波状态（Q15），只给 PI/前馈 */
     int32_t      stop_step_q24;             /* 本次停机的斜率：受控 / 急停 */
     lt_err_t     err;                       /* 保护错误码：首错锁存，重上电才清 */
     tasks_mode_t mode;                      /* 指令：模式 */
@@ -48,7 +49,6 @@ static tasks_info_t *tasks_info = &tasks_obj.info;
 
 typedef struct {
     uint8_t  idx;           /* PID 池下标 */
-    uint8_t  type;          /* 0 = Q15 信号，1 = Q24 */
     uint32_t freq;          /* 调用频率 */
     int32_t  kp, ki, kd;    /* Q15.15 增益 */
     int32_t  out_max;       /* 输出限幅（正负对称）*/
@@ -56,10 +56,10 @@ typedef struct {
 
 /* 三环 PID 参数配置表，Q格式标幺化 */
 static const pid_cfg_t pid_cfg[] = {
-    { PID_ID,    0, CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
-    { PID_IQ,    0, CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
-    { PID_SPEED, 1, SPEED_LOOP_HZ,   SPEED_KP_Q15, SPEED_KI_Q15, 0,          SPEED_IQ_LIMIT_Q24 },
-    { PID_POS,   1, POS_LOOP_HZ,     POS_KP_Q15,   0,            POS_KD_Q15, Q24_PU },
+    { PID_ID,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
+    { PID_IQ,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
+    { PID_SPEED, SPEED_LOOP_HZ,   SPEED_KP_Q15, SPEED_KI_Q15, 0,          SPEED_IQ_LIMIT_Q24 },
+    { PID_POS,   POS_LOOP_HZ,     POS_KP_Q15,   0,            POS_KD_Q15, Q24_PU },
 };
 
 /* 三环控制任务，内部默认级联分频，无指令更新延迟 */
@@ -108,7 +108,7 @@ void control_tasks_init(void)
     /* 四个环同构，照表一个循环初始化 */
     for (unsigned i = 0; i < sizeof(pid_cfg) / sizeof(pid_cfg[0]); i++) {
         const pid_cfg_t *cfg = &pid_cfg[i];
-        lt_pid_init(cfg->idx, cfg->type, cfg->freq);
+        lt_pid_init(cfg->idx, cfg->freq);
         lt_pid_set (cfg->idx, cfg->kp, cfg->ki, cfg->kd);
         lt_pid_set_limits(cfg->idx, cfg->out_max, -cfg->out_max);
         lt_pid_set_target(cfg->idx, 0);
@@ -293,6 +293,11 @@ static void current_loop_task(void)                 /* 电流环任务 */
 
     /* 幅值不变 Clarke+Park：与 lt_foc_update 共用同一张表和 step，严格互逆 */
     lt_foc_clark_park(f3, the_park, &Id, &Iq);
+    /* 电流反馈轻滤波：一阶 IIR，只给 PI 和前馈用；上报保持原始值 */
+    tasks->id_flt += (Id - tasks->id_flt) >> CUR_FB_IIR_SHIFT;
+    tasks->iq_flt += (Iq - tasks->iq_flt) >> CUR_FB_IIR_SHIFT;
+    int32_t id_fb = tasks->id_flt;
+    int32_t iq_fb = tasks->iq_flt;
     /* 上报存 Q15 标幺 */
     tasks_info->Ia = Ia;                              
     tasks_info->Ib = Ib;
@@ -311,8 +316,8 @@ static void current_loop_task(void)                 /* 电流环任务 */
         vq = tasks->target;                     /* 已是 Q15：1.0 pu = 母线/√3 */
         vd = 0;
     } else {
-        vd = lt_pi_update(PID_ID, Id);          /* 输出 Q15 电压标幺（1.0 pu = 母线/√3）*/
-        vq = lt_pi_update(PID_IQ, Iq);
+        vd = lt_pi_update(PID_ID, id_fb);          /* 输出 Q15 电压标幺（1.0 pu = 母线/√3）*/
+        vq = lt_pi_update(PID_IQ, iq_fb);
         /* DQ 交叉前馈解耦：Vd_ff = −we·Ls·Iq、Vq_ff = we·(Ls·Id + ψf)，
          * 系数按 pu 折在 tasks_param_def.h，释放高速电压裕量 */
         /* we = speed·2π·PP/CPR：系数折成 Q30 常量 */
@@ -320,8 +325,8 @@ static void current_loop_task(void)                 /* 电流环任务 */
         /* FF_L_Q24 为了让"乘 Q15 电流"这一步成立预先 ×32768，所以必须先 >>15 降回 Q24
          * 再乘 we——漏了这级就把解耦前馈放大 32768 倍，电压直接被焊在限幅上、电流环失控。
          * FF_PSI_Q24 不含电流因子，它的 >>24 正好出 Q15，不用降 */
-        int32_t li_d = (int32_t)(((int64_t)FF_L_Q24 * Id) >> 15);
-        int32_t li_q = (int32_t)(((int64_t)FF_L_Q24 * Iq) >> 15);
+        int32_t li_d = (int32_t)(((int64_t)FF_L_Q24 * id_fb) >> 15);
+        int32_t li_q = (int32_t)(((int64_t)FF_L_Q24 * iq_fb) >> 15);
         vd -= (int32_t)(((int64_t)we * li_q) >> 24);
         vq += (int32_t)(((int64_t)we * (li_d + FF_PSI_Q24)) >> 24);
     }
