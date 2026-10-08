@@ -33,8 +33,8 @@ typedef struct{
 
     /* ---- 输出累加器 ---- */
     int64_t  out_acc;           /* 输出（信号单位）× 2^PID_ACC_SH */
-    int32_t  out_max;           /* 输出上限（信号单位）*/
-    int32_t  out_min;           /* 输出下限（信号单位）*/
+    int64_t  out_max;           /* 输出上限 × 2^PID_ACC_SH */
+    int64_t  out_min;           /* 输出下限 × 2^PID_ACC_SH */
 
     int64_t  err;               /* 上一拍偏差（int64）*/
     int64_t  err2;              /* 上上拍偏差（int64）*/
@@ -63,8 +63,8 @@ uint8_t lt_pid_init(uint8_t idx, uint32_t freq)
     pid = &pid_pool[idx];
     memset(pid, 0, sizeof(lt_pid_object));
     pid->freq    = freq ? freq : 1;
-    pid->out_max =  PID_OUT_LIM_DEF;
-    pid->out_min = -PID_OUT_LIM_DEF;
+    pid->out_max =  (int64_t)PID_OUT_LIM_DEF << PID_ACC_SH;
+    pid->out_min = -((int64_t)PID_OUT_LIM_DEF << PID_ACC_SH);   /* 先移位再取负，别左移负数 */
     return 1;
 }
 
@@ -111,8 +111,8 @@ void lt_pid_set_limits(uint8_t idx, int32_t out_max, int32_t out_min)
         out_max = out_min;
         out_min = t;
     }
-    pid->out_max = out_max;                 /* 信号单位 */
-    pid->out_min = out_min;
+    pid->out_max = (int64_t)out_max << PID_ACC_SH;   /* 入参仍是信号单位，存成累加器单位 */
+    pid->out_min = (int64_t)out_min << PID_ACC_SH;
 }
 
 int32_t lt_pid_get(uint8_t idx)
@@ -125,11 +125,9 @@ int32_t lt_pid_get(uint8_t idx)
 /* 输出累加 + 限幅：在累加器尺度做，避免小增量被截成 0 */
 static inline int32_t _out_commit(lt_pid_t pid, int64_t d)
 {
-    int64_t hi  = (int64_t)pid->out_max << PID_ACC_SH;
-    int64_t lo  = (int64_t)pid->out_min << PID_ACC_SH;
     int64_t out = pid->out_acc + d;
-    if (out > hi)      out = hi;
-    else if (out < lo) out = lo;
+    if (out > pid->out_max)      out = pid->out_max;
+    else if (out < pid->out_min) out = pid->out_min;
     pid->out_acc = out;
     return (int32_t)(out >> PID_ACC_SH);
 }

@@ -112,6 +112,9 @@ float lt_interp_bilinear(float x, float y,
                          uint16_t nx, uint16_t ny);   /* 二维插值，行优先，边界 clamp */
 void lt_interp_hermite3(float t, float p0, float v0, float p1, float v1,  /* t：归一化输入时间 */
                         float *p, float *v);          /* 三次 Hermite 插值，t ∈ [0,1]，输出位置（p）和速度（v）*/
+void lt_interp_hermite3_q24(int32_t t_q16, int32_t p0_q24, int32_t v0_q24,   /* t_q16: 0~65536 */
+                            int32_t p1_q24, int32_t v1_q24,               /* p/v: Q24 位置/斜率 */
+                            int32_t *p_q24, int32_t *v_q24);              /* 输出可空 */
 
 /* 最小二乘线性回归：y = a0 + a1*x1 + a2*x2 + ... + an*xn
  *   x    : 自变量数组，大小为 m x n，行优先存储（x[样本][变量]）
