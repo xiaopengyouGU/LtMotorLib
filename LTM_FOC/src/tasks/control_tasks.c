@@ -184,6 +184,12 @@ void control_tasks_stop(uint8_t estop)        /* 停机 */
     control_tasks_set(Mode_Stop, 0);
 }
 
+/* 模式快照：应用层唯一的 mode 数据源，别再自己存一份 */
+tasks_mode_t control_tasks_get_mode(void)
+{
+    return tasks->mode;
+}
+
 void control_tasks_get(tasks_info_t *info)   
 {
     if (!info) return;

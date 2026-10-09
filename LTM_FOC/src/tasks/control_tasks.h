@@ -19,5 +19,6 @@ void control_tasks_stop(uint8_t estop);
 void control_tasks_get(tasks_info_t *info);             /* 取内部快照（控制域单位，不含浮点）*/
 void control_tasks_zero_find(void);                     /* 电角度绝对零点找寻 */
 void control_tasks_plan_start(void);                    /* 位置模式重规划（Start 时调；运行中改目标由 set 触发）*/
+tasks_mode_t control_tasks_get_mode(void);              /* 只获取模式快照 */
 
 #endif

@@ -4,8 +4,6 @@
 #include "tasks/control_tasks.h"
 #include "common/tasks_param_def.h"
 
-/* main 侧的指令副本：不回头去读中断写的对象 */
-static tasks_mode_t s_mode = Mode_Open_Loop;
 /* 对称范围判断：超出 ±max 为真 */
 #define LT_OVER_RANGE(v, max)   ((v) > (max) || (v) < -(max))
 /* 超范围直接返回 LT_ERR_OVER_RANGE */
@@ -103,7 +101,7 @@ lt_err_t lt_motor_run(void)              /* 电机启动 */
         if (LT_OVER_RANGE(info.speed_pll, STOP_DONE))   return LT_ERR_STATE;
     } 
     /* 位置模式：Start 时做初次规划（尚未 Running，与规划器无竞态）*/
-    if (s_mode == Mode_Position) {
+    if (control_tasks_get_mode() == Mode_Position) {
         control_tasks_plan_start();
     }
     lt_fsm_update(Event_Run);
@@ -121,8 +119,8 @@ lt_err_t lt_motor_stop(uint8_t estop)    /* 电机停机：0 受控（25pu/s）�
 
 lt_err_t lt_motor_set(lt_motor_mode_t mode, float target)
 {
-    /* 只有在 IDLE 状态下允许切换运行模式 */
-    if (mode != s_mode && lt_fsm_get() != State_Idle)  return LT_ERR_STATE;
+    /* IDLE 或 STOP（受控停机已停稳、占空比已清零）都允许切换运行模式 */
+    if (mode != control_tasks_get_mode() && lt_fsm_get() != State_Idle && lt_fsm_get() != State_Stop)  return LT_ERR_STATE;
 
     /* 位置模式额外要求：当前位置也在范围内 */
     if (mode == Mode_Position) {
@@ -135,8 +133,7 @@ lt_err_t lt_motor_set(lt_motor_mode_t mode, float target)
     lt_err_t err = _target_encode(mode, target, &enc);   /* 内含范围检查 + 换算 */
     if (err != LT_OK)  return err;
 
-    s_mode = mode;                                       /* 模式更新 */
-    control_tasks_set(s_mode, enc);                      /* 入口换算：float → 控制域 */
+    control_tasks_set(mode, enc);                        /* 入口换算：float → 控制域 */
 
     return LT_OK;
 }
