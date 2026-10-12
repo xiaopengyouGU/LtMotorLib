@@ -29,6 +29,10 @@
  * 否则 the 被打飞、转矩方向翻转——就是"莫名反向"的来源 */
 #define SPEED_PLL_CPS_MAX   ((int32_t)((int64_t)OVER_SPEED * MOTOR_CPR / 60))
 
+/* 上报死区：PLL 的死区是 1 RPM（PLL_MIN_SPEED_RPM），它以下没有有效读数，
+ * 直接归零——否则两级整数低通的粘滞会把 0 显示成 ±0.4 RPM */
+#define SPEED_REP_DEADBAND_CPS  ((int32_t)(MOTOR_CPR / 60.0f))
+
 /* ======================== 控制对象 ======================== */
 typedef struct {
     uint8_t      div_cnt;                   /* 级联分频计数器 */
@@ -384,7 +388,15 @@ static void speed_loop_task(void)                   /* 速度环任务 */
     /* 测速结果上报，并进行过速保护判断：±OVER_SPEED_Q24 */
     tasks_info->speed     = speed;                  
     /* 上报速度单独低通：只影响上报曲线，环路反馈仍用原始 PLL 值 */
-    tasks->speed_rep_flt += (speed_pll - tasks->speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
+    int32_t sp_rep = speed_pll;
+    if (sp_rep < SPEED_REP_DEADBAND_CPS && sp_rep > -SPEED_REP_DEADBAND_CPS)
+        sp_rep = 0;                                     /* PLL 死区内没有有效读数 */
+    tasks->speed_rep_flt += (sp_rep - tasks->speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
+    /* 移位 IIR 有粘滞：输入已为 0 时别让状态卡在 ±2^N 内回不到 0 */
+    if (sp_rep == 0 &&
+        tasks->speed_rep_flt > -(1 << SPEED_REP_IIR_SHIFT) &&
+        tasks->speed_rep_flt <  (1 << SPEED_REP_IIR_SHIFT))
+        tasks->speed_rep_flt = 0;
     tasks_info->speed_pll = tasks->speed_rep_flt;
     if (speed_q24 > OVER_SPEED_Q24 || speed_q24 < -OVER_SPEED_Q24) {
         _protect_trip(LT_ERR_OVER_SPEED);
