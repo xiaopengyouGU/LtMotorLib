@@ -27,9 +27,10 @@
 #define SPEED_LOOP_BW                       60.0f       /* 速度环带宽（Hz）*/
 #define POS_LOOP_BW                         8.0f        /* 位置环带宽（Hz）*/
 #define CUR_FB_IIR_SHIFT                   1           /* 电流反馈一阶 IIR：y+=(x-y)>>N，只进 PI/前馈；N=1 时 20kHz 下 fc≈2.3kHz，800Hz 穿越处相移 -14° */
+#define SPEED_REP_IIR_SHIFT                5           /* 上报速度一阶 IIR：y+=(x-y)>>N，只滤上报曲线，不进环路 */
 #define SPEED_IQ_LIMIT                      7.6f        /* 速度环输出限幅 ±7.6A，避免触发过流保护 */
 #define ANGEL_DELAY_STEP                    0           /* 是否有角度测量一拍延迟，1：有，0：无 */
-/* 锁相环：PLL测速 在电流环里跑，f_n = 300Hz、ζ=0.7（约速度环带宽的 4 倍）
+/* 锁相环：PLL测速 在电流环里跑，f_n = 300Hz、ζ=0.7（取速度环 60Hz 的 5 倍）
  * Kp = 4πζ·f_n、Ki = (2π·f_n)²/freq */
 #define PLL_KP                              2639
 #define PLL_KI                              ((uint32_t)(39.478f * 300.0f * 300.0f / CURRENT_LOOP_HZ + 0.5f))

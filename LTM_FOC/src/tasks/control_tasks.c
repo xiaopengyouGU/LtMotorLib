@@ -25,6 +25,10 @@
 #define PID_POS         3U
 #define SCURVE_IDX      0U
 
+/* PLL 速度上限（count/s）：单拍脏值不许进角度延迟补偿和解耦前馈，
+ * 否则 the 被打飞、转矩方向翻转——就是"莫名反向"的来源 */
+#define SPEED_PLL_CPS_MAX   ((int32_t)((int64_t)OVER_SPEED * MOTOR_CPR / 60))
+
 /* ======================== 控制对象 ======================== */
 typedef struct {
     uint8_t      div_cnt;                   /* 级联分频计数器 */
@@ -37,6 +41,7 @@ typedef struct {
     uint8_t      in_pos;                    /* 位置到位指示 */
     int32_t      ph_i_q15[3];               /* 本拍三相电流，死区补偿用 */
     int32_t      id_flt, iq_flt;            /* 电流反馈滤波状态（Q15），只给 PI/前馈 */
+    int32_t      speed_rep_flt;             /* 上报速度低通状态（count/s）*/
     int32_t      stop_step_q24;             /* 本次停机的斜率：受控 / 急停 */
     lt_err_t     err;                       /* 保护错误码：首错锁存，重上电才清 */
     tasks_mode_t mode;                      /* 指令：模式 */
@@ -66,6 +71,13 @@ static const pid_cfg_t pid_cfg[] = {
 static void    current_loop_task(void);            /* 电流环任务：默认 20kHz */
 static void    speed_loop_task(void);              /* 速度环任务：默认 4kHz */
 static void    position_loop_task(void);           /* 位置环任务：默认 1kHz */
+
+/* 速度给定限幅：ref / ramp 只允许落在 ±TARGET_SPEED_MAX_RPM。PLL 打嗝、
+ * 旧给定残留这类脏值一律挡在 PI 之外——给定只认 target */
+static inline int32_t _ref_limit(int32_t q24)
+{
+    return lt_clamp_i32(q24, TARGET_SPEED_MAX_Q24, -TARGET_SPEED_MAX_Q24);
+}
 
 /* 上电电角度绝对零点：纯 D 轴静态吸死 —— 磁场钉在 the=0，转子吸到最近的 d 轴，
  * 末段取 ZERO_ALIGN_AVG 点单圈 count 平均作为零点。阻塞，必须在 ISR 回调绑定前调用 */
@@ -159,12 +171,12 @@ void control_tasks_set(tasks_mode_t mode, int32_t target)
         break;
 
     case Mode_Ramp_Speed:                       /* 斜坡起点取当前转速 */
-        if (changed) tasks->speed_ramp_q24 = CNT_TO_Q24(tasks_info->speed_pll);
+        if (changed) tasks->speed_ramp_q24 = _ref_limit(CNT_TO_Q24(tasks_info->speed_pll));
         tasks->speed_ref_q24 = tasks->speed_ramp_q24;
         break;
 
     case Mode_Stop:                             /* 可控停机：给定从当前转速起收 */
-        tasks->speed_ref_q24 = CNT_TO_Q24(tasks_info->speed_pll);
+        tasks->speed_ref_q24 = _ref_limit(CNT_TO_Q24(tasks_info->speed_pll));
         break;
 
     case Mode_Position:
@@ -264,6 +276,22 @@ static void _protect_scan(int32_t vbus_q15, int32_t motor_temp, int32_t driver_t
     }
 }
 
+/* 清运行态：停机（受控停机收尾、失能）时调用。目标/给定/斜坡/规划前馈一并归零，
+ * 保证下次启动不继承上一轮的给定与规划；四个 PID 的目标也清掉，避免失能后
+ * 直接 Start 又把上一次的力矩/速度指令打出去。*/
+void control_tasks_clear(void)
+{
+    tasks->target         = 0;
+    tasks->speed_ref_q24  = 0;
+    tasks->speed_ramp_q24 = 0;
+    tasks->pos_cmd_prev   = 0;
+    tasks->scurve_ready   = 0;
+    lt_pid_set_target(PID_SPEED, 0);
+    lt_pid_set_target(PID_POS,   0);
+    lt_pid_set_target(PID_IQ,    0);
+    lt_pid_set_target(PID_ID,    0);
+}
+
 static void current_loop_task(void)                 /* 电流环任务 */
 {
     uint32_t pos_count  = ltm_enc_get_count();      /* count = 0~CPR-1 */
@@ -273,6 +301,8 @@ static void current_loop_task(void)                 /* 电流环任务 */
     int32_t  dutys[3] = { 0, 0, 0 };
     lt_speed_update(pos_count);                     /* PLL测速更新：count/s */
     lt_speed_get(NULL, &speed_pll);
+    /* PLL 打嗝防护：脏速度只影响上报，绝不许进 the/we 的补偿项 */
+    speed_pll = lt_clamp_i32(speed_pll, SPEED_PLL_CPS_MAX, -SPEED_PLL_CPS_MAX);
 
     /* 电角度 =（单圈计数 − 零点偏置）× 极对数 */
     uint32_t the  = COUNT_TO_THE(pos_count, tasks->zero_offset);
@@ -353,7 +383,9 @@ static void speed_loop_task(void)                   /* 速度环任务 */
     int32_t speed_ref_q24 = tasks->speed_ref_q24;   /* 参考速度给定 */
     /* 测速结果上报，并进行过速保护判断：±OVER_SPEED_Q24 */
     tasks_info->speed     = speed;                  
-    tasks_info->speed_pll = speed_pll;
+    /* 上报速度单独低通：只影响上报曲线，环路反馈仍用原始 PLL 值 */
+    tasks->speed_rep_flt += (speed_pll - tasks->speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
+    tasks_info->speed_pll = tasks->speed_rep_flt;
     if (speed_q24 > OVER_SPEED_Q24 || speed_q24 < -OVER_SPEED_Q24) {
         _protect_trip(LT_ERR_OVER_SPEED);
     }                  
@@ -369,6 +401,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
         /* 速度给定收到 0、且实测速度也进了窗口 → 清占空比（此刻反电势已可忽略），进 Stop */
         if (speed_ref_q24 == 0 &&
             speed_q24 <= STOP_DONE_Q24 && speed_q24 >= -STOP_DONE_Q24) {
+            control_tasks_clear();              /* 停稳：清运行态，下次启动从干净状态起 */
             ltm_pwm_set_dutys(0, 0, 0);
             lt_fsm_update(Event_Stop);          /* 停完 → fsm 进 Stop，mode 停在 Mode_Stop */
             return;
@@ -379,7 +412,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
 
         /* 斜坡速度：目标按 SPEED_RAMP_STEP_Q24 逼近，阶跃指令不产生冲击 */
         if (mode == Mode_Ramp_Speed) {
-            int32_t d = tasks->target - tasks->speed_ramp_q24;
+            int64_t d = (int64_t)tasks->target - (int64_t)tasks->speed_ramp_q24;   /* int64：两个 int32 相减会溢出（有符号 UB） */
             if (d > SPEED_RAMP_STEP_Q24)        tasks->speed_ramp_q24 += SPEED_RAMP_STEP_Q24;
             else if (d < -SPEED_RAMP_STEP_Q24)  tasks->speed_ramp_q24 -= SPEED_RAMP_STEP_Q24;
             else                                tasks->speed_ramp_q24  = tasks->target;
@@ -390,6 +423,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
      * 位置模式：由位置环逐拍写 */
 
     /* 速度环 PI：给定与反馈都是 Q24 圈/s */
+    speed_ref_q24 = _ref_limit(speed_ref_q24);            /* 给定限幅：只认合法转速范围 */
     lt_pid_set_target(PID_SPEED, speed_ref_q24);
     int32_t iq_q15 = lt_pi_update(PID_SPEED, speed_q24) >> 9;   /* Q24 → Q15 */
 
@@ -449,7 +483,10 @@ static void position_loop_task(void)
                      pos_q24 >= tasks->target - POS_WIN_Q24) ? 1 : 0;
     lt_pid_set_target(PID_POS, cmd_q24);
     int32_t speed_q24 = lt_pd_update(PID_POS, pos_q24);
-    int32_t ff_q24 = (cmd_q24 - tasks->pos_cmd_prev) * (int32_t)POS_LOOP_HZ;
+    /* 一阶差分 × 位置环频率：int64 算完再限幅，别让 int32 乘法溢出（UB） */
+    int32_t ff_q24 = (int32_t)lt_clamp_i64(
+        ((int64_t)cmd_q24 - tasks->pos_cmd_prev) * (int32_t)POS_LOOP_HZ,
+        POS_VMAX_Q24, -POS_VMAX_Q24);
     tasks->pos_cmd_prev = cmd_q24;
 
     /* 前馈叠加后再限幅 */

@@ -46,6 +46,7 @@ static lt_err_t _motor_disable(void)   /* 电机失能 */
 {
     driver_disable();                  /* 驱动失能 */
     lt_fsm_update(Event_Disable);      /* 状态机更新 */
+    control_tasks_clear();             /* 清运行态：失能后不残留上一轮给定 */
     return LT_OK;
 }
 
