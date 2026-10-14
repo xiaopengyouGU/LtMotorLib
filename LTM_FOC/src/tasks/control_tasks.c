@@ -24,9 +24,11 @@
 #define PID_SPEED       2U
 #define PID_POS         3U
 #define SCURVE_IDX      0U
+#define RAMP_SPEED_IDX  0U
 
 /* PLL 速度上限（count/s）：单拍脏值不许进角度延迟补偿和解耦前馈，
  * 否则 the 被打飞、转矩方向翻转——就是"莫名反向"的来源 */
+
 #define SPEED_PLL_CPS_MAX   ((int32_t)((int64_t)OVER_SPEED * MOTOR_CPR / 60))
 
 /* 上报死区：PLL 的死区是 1 RPM（PLL_MIN_SPEED_RPM），它以下没有有效读数，
@@ -39,8 +41,6 @@ typedef struct {
     uint32_t     zero_offset;               /* 电角度零点（calib 结果）*/
     int32_t      target;                    /* 目标值：已按模式完成换算 */
     int32_t      speed_ref_q24;             /* 速度给定（Q24 圈/s）*/
-    int32_t      speed_ramp_q24;            /* 斜坡速度模式当前值 */
-    int32_t      pos_cmd_prev;              /* 上拍规划位置：用于速度前馈 */
     uint8_t      scurve_ready;              /* 位置规划器已启动 */
     uint8_t      in_pos;                    /* 位置到位指示 */
     int32_t      ph_i_q15[3];               /* 本拍三相电流，死区补偿用 */
@@ -65,8 +65,8 @@ typedef struct {
 
 /* 三环 PID 参数配置表，Q格式标幺化 */
 static const pid_cfg_t pid_cfg[] = {
-    { PID_ID,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
-    { PID_IQ,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          Q15_PU },
+    { PID_ID,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          CURR_V_LIM_Q15 },
+    { PID_IQ,    CURRENT_LOOP_HZ, CURR_KP_Q15,  CURR_KI_Q15,  0,          CURR_V_LIM_Q15 },
     { PID_SPEED, SPEED_LOOP_HZ,   SPEED_KP_Q15, SPEED_KI_Q15, 0,          SPEED_IQ_LIMIT_Q24 },
     { PID_POS,   POS_LOOP_HZ,     POS_KP_Q15,   0,            POS_KD_Q15, Q24_PU },
 };
@@ -83,34 +83,72 @@ static inline int32_t _ref_limit(int32_t q24)
     return lt_clamp_i32(q24, TARGET_SPEED_MAX_Q24, -TARGET_SPEED_MAX_Q24);
 }
 
-/* 上电电角度绝对零点：纯 D 轴静态吸死 —— 磁场钉在 the=0，转子吸到最近的 d 轴，
- * 末段取 ZERO_ALIGN_AVG 点单圈 count 平均作为零点。阻塞，必须在 ISR 回调绑定前调用 */
+/*==============================================================================
+ * 上电电角度零点：D 轴小占空比强拖（正反各 ZERO_SWEEP_ELEC_TURNS 个电周期）
+ *   1) 正转：电角度从 0 走到 +ZERO_SWEEP_ELEC_TURNS 个电周期（1ms 一步）；
+ *   2) 反转：再走回 0（反向同样扫 ZERO_SWEEP_ELEC_TURNS 个电周期），停在 0 位；
+ *   3) 停在 0 电角度保持 ZERO_SETTLE_MS，把转子吸在 0 位；
+ *   4) 读点：占空比全程保持不动（不关输出、不改占空比），
+ *      末段 ZERO_AVG_N 个点（1ms 一点）取平均当零点，峰峰值当停稳判据。
+ *   必须在 ISR 回调绑定前调用。
+ *============================================================================*/
 void control_tasks_zero_find(void)
 {
-    int32_t dutys[3];
-    int32_t sum = 0;
+    int32_t  dutys[3];
+    uint32_t the = 0U;
+    int32_t  c_ref = 0, c_prev = 0, disp = 0, d_min = 0, d_max = 0;
+    int64_t  sum = 0;
+    uint16_t n;
+    uint8_t  i;
 
     ltm_pwm_start();
 
-    lt_foc_update(ZERO_FIND_DUTY_Q15, 0, 0, dutys);      /* the=0 的静态 d 轴磁场 */
-    ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
-    ltm_delay_ms(ZERO_ALIGN_HOLD_MS);
-
-    for (uint8_t k = 0; k < ZERO_ALIGN_AVG; k++) {
-        ltm_enc_update();
-        sum += (int32_t)ltm_enc_get_count();
+    for (n = 0; n < ZERO_SWEEP_POINTS; n++) {               /* 1) 正转两圈 */
+        lt_foc_update(ZERO_FIND_DUTY_Q15, 0, the, dutys);
+        ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
         ltm_delay_ms(1);
+        the += ZERO_SWEEP_THE_STEP;
+    }
+    for (n = 0; n < ZERO_SWEEP_POINTS; n++) {               /* 2) 反转两圈，回到 0 */
+        lt_foc_update(ZERO_FIND_DUTY_Q15, 0, the, dutys);
+        ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
+        ltm_delay_ms(1);
+        the -= ZERO_SWEEP_THE_STEP;
+    }
+
+    lt_foc_update(ZERO_FIND_DUTY_Q15, 0, 0, dutys);         /* 3) 停在 0 位吸住 */
+    ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
+    ltm_delay_ms(ZERO_SETTLE_MS);
+
+    for (i = 0; i < ZERO_AVG_N; i++) {                      /* 4) 读点：占空比保持住 */
+        int32_t d;
+
+        ltm_delay_ms(1);
+        ltm_enc_update();
+        if (i == 0) c_ref = c_prev = (int32_t)ltm_enc_get_count();
+
+        d = (int32_t)ltm_enc_get_count() - c_prev;           /* 跨圈用增量累积 */
+        if (d >  (int32_t)(MOTOR_CPR / 2U)) d -= (int32_t)MOTOR_CPR;
+        else if (d < -(int32_t)(MOTOR_CPR / 2U)) d += (int32_t)MOTOR_CPR;
+        disp += d;
+        c_prev += d;
+        sum  += disp;
+        if (disp < d_min) d_min = disp;
+        if (disp > d_max) d_max = disp;
     }
 
     ltm_pwm_set_dutys(0, 0, 0);
     ltm_pwm_stop();
 
-    int32_t off = sum / (int32_t)ZERO_ALIGN_AVG;
+    int32_t off = c_ref + (int32_t)(sum / ZERO_AVG_N);
     off %= (int32_t)MOTOR_CPR;
     if (off < 0) off += (int32_t)MOTOR_CPR;
 
-    tasks->zero_offset = (uint32_t)off;                  /* 控制层直接持有零点 */
+    tasks->zero_offset      = (uint32_t)off;
+    tasks_info->zero_end    = off;
+    tasks_info->zero_spread = d_max - d_min;
 }
+
 void control_tasks_init(void)
 {
     memset(tasks, 0, sizeof(tasks_obj_t));
@@ -121,6 +159,13 @@ void control_tasks_init(void)
     lt_foc_init();
     lt_foc_set(MOTOR_CPR);                    /* 输入编码器单圈分辨率 */
 
+#if DZ_ENABLE
+    /* 死区补偿：电流极性法（参数见 boards/<board>/user_param_def.h）。
+     * 只叠加在输出占空比上，电流环其余环节不动 */
+    lt_deadzone_init(DZ_DEAD_DUTY_Q15, DZ_ITH_Q15, DZ_ALPHA_SHIFT);
+    lt_deadzone_set(DZ_DIR_A, DZ_DIR_B, DZ_DIR_C);
+#endif
+
     /* 四个环同构，照表一个循环初始化 */
     for (unsigned i = 0; i < sizeof(pid_cfg) / sizeof(pid_cfg[0]); i++) {
         const pid_cfg_t *cfg = &pid_cfg[i];
@@ -130,7 +175,7 @@ void control_tasks_init(void)
         lt_pid_set_target(cfg->idx, 0);
     }
 
-    lt_speed_init(MOTOR_CPR, CURRENT_LOOP_HZ);  /* PLL测速 在电流环里跑 */
+    lt_speed_init(MOTOR_CPR, CURRENT_LOOP_HZ / PLL_DIV);   /* PLL 更新率 = 电流环 / PLL_DIV */
     lt_speed_set((uint32_t)PLL_KP, (uint32_t)PLL_KI);
 }
 
@@ -160,6 +205,8 @@ void control_tasks_set(tasks_mode_t mode, int32_t target)
         tasks->mode = mode;
         lt_pid_reset(PID_SPEED);                /* 换模式清积分，防旧目标残留 */
         lt_pid_reset(PID_POS);
+        lt_pid_reset(PID_ID);                   /* 电流环累加器一起清：不让上一轮的电压残留到新一轮头几拍 */
+        lt_pid_reset(PID_IQ);
     }
     tasks->target = target;
 
@@ -175,19 +222,31 @@ void control_tasks_set(tasks_mode_t mode, int32_t target)
         break;
 
     case Mode_Ramp_Speed:                       /* 斜坡起点取当前转速 */
-        if (changed) tasks->speed_ramp_q24 = _ref_limit(CNT_TO_Q24(tasks_info->speed_pll));
-        tasks->speed_ref_q24 = tasks->speed_ramp_q24;
+        if (changed) {
+            lt_ramp_start(RAMP_SPEED_IDX, _ref_limit(CNT_TO_Q24(tasks_info->speed_pll)),
+                          target, SPEED_RAMP_STEP_Q24);
+        } else {
+            lt_ramp_set_target(RAMP_SPEED_IDX, target);   /* 运行中改目标：斜坡自己续 */
+        }
+        tasks->speed_ref_q24 = lt_ramp_get(RAMP_SPEED_IDX);
         break;
 
     case Mode_Stop:                             /* 可控停机：给定从当前转速起收 */
-        tasks->speed_ref_q24 = _ref_limit(CNT_TO_Q24(tasks_info->speed_pll));
+        lt_ramp_start(RAMP_SPEED_IDX, _ref_limit(CNT_TO_Q24(tasks_info->speed_pll)),
+                      0, tasks->stop_step_q24);
+        tasks->speed_ref_q24 = lt_ramp_get(RAMP_SPEED_IDX);
         break;
 
     case Mode_Position:
-        tasks->speed_ref_q24 = 0;             /* 位置环接管速度给定，起步从 0 */
-        tasks->scurve_ready  = 0;
-        /* 规划只在 main 上下文做：Running 时重规划，lt_scurve 的 ready 会挡住中断步进 */
-        if (lt_fsm_get() == State_Running) control_tasks_plan_start();
+        /* 运行中改目标：交给规划器在线重规划（位置、速度都从当前指令状态续走），
+         * 不打断运动；刚切进位置模式才需要从 0 起步、重建状态 */
+        if (!changed && tasks->scurve_ready) {
+            lt_scurve_set_target(SCURVE_IDX, target);
+        } else {
+            tasks->speed_ref_q24 = 0;         /* 位置环接管速度给定，起步从 0 */
+            tasks->scurve_ready  = 0;
+            if (lt_fsm_get() == State_Running) control_tasks_plan_start();
+        }
         break;
 
     default:   break;                         /* 开环：目标直通电流环 */
@@ -228,13 +287,11 @@ void control_tasks_plan_start(void)
     cfg.target_pos = tasks->target;                /* 已是 Q24 圈值 */
     cfg.v_start    = 0;
     cfg.v_max      = POS_VMAX_Q24;
-    cfg.v_stop     = 0;
     cfg.acct_ms    = POS_ACC_MS;
     cfg.dect_ms    = POS_ACC_MS;
     cfg.period_ms  = 1;                             /* 位置环 1kHz */
     cfg.type       = 0;                             /* T 形加减速 */
     lt_scurve_start(SCURVE_IDX, &cfg);
-    tasks->pos_cmd_prev = cfg.start_pos;            /* 前馈起点对齐，首拍不跳变 */
 
     tasks->scurve_ready = 1;                
 }
@@ -287,8 +344,7 @@ void control_tasks_clear(void)
 {
     tasks->target         = 0;
     tasks->speed_ref_q24  = 0;
-    tasks->speed_ramp_q24 = 0;
-    tasks->pos_cmd_prev   = 0;
+    lt_ramp_reset(RAMP_SPEED_IDX);                 /* 清模块状态，下次起步重建 */
     tasks->scurve_ready   = 0;
     lt_pid_set_target(PID_SPEED, 0);
     lt_pid_set_target(PID_POS,   0);
@@ -303,7 +359,7 @@ static void current_loop_task(void)                 /* 电流环任务 */
     int32_t  Ia, Ib, Ic;
     int32_t  vd, vq;
     int32_t  dutys[3] = { 0, 0, 0 };
-    lt_speed_update(pos_count);                     /* PLL测速更新：count/s */
+    lt_speed_update(pos_count);                     /* 单位 counts/s */
     lt_speed_get(NULL, &speed_pll);
     /* PLL 打嗝防护：脏速度只影响上报，绝不许进 the/we 的补偿项 */
     speed_pll = lt_clamp_i32(speed_pll, SPEED_PLL_CPS_MAX, -SPEED_PLL_CPS_MAX);
@@ -358,6 +414,7 @@ static void current_loop_task(void)                 /* 电流环任务 */
     } else {
         vd = lt_pi_update(PID_ID, id_fb);          /* 输出 Q15 电压标幺（1.0 pu = 母线/√3）*/
         vq = lt_pi_update(PID_IQ, iq_fb);
+#if DQ_DECOUPLE
         /* DQ 交叉前馈解耦：Vd_ff = −we·Ls·Iq、Vq_ff = we·(Ls·Id + ψf)，
          * 系数按 pu 折在 tasks_param_def.h，释放高速电压裕量 */
         /* we = speed·2π·PP/CPR：系数折成 Q30 常量 */
@@ -369,12 +426,13 @@ static void current_loop_task(void)                 /* 电流环任务 */
         int32_t li_q = (int32_t)(((int64_t)FF_L_Q24 * iq_fb) >> 15);
         vd -= (int32_t)(((int64_t)we * li_q) >> 24);
         vq += (int32_t)(((int64_t)we * (li_d + FF_PSI_Q24)) >> 24);
+#endif
     }
-    /* 前馈叠加后仍留在 Q15，避免落到 int16 时回绕 */
-    vd = lt_clamp_i32(vd, Q15_PU, -Q15_PU);
-    vq = lt_clamp_i32(vq, Q15_PU, -Q15_PU);
     /* SVPWM 输出 Q15 占空比 */
-    lt_foc_update((int16_t)vd, (int16_t)vq, the_mod, dutys);   
+    lt_foc_update(vd, vq, the_mod, dutys);   
+#if DZ_ENABLE
+    lt_deadzone_compensate(Ia, Ib, Ic, dutys);   /* 死区补偿：就地叠加到 Q15 占空比 */
+#endif
     ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
 }
 
@@ -400,15 +458,12 @@ static void speed_loop_task(void)                   /* 速度环任务 */
     tasks_info->speed_pll = tasks->speed_rep_flt;
     if (speed_q24 > OVER_SPEED_Q24 || speed_q24 < -OVER_SPEED_Q24) {
         _protect_trip(LT_ERR_OVER_SPEED);
-    }                  
+    }
     if (lt_fsm_get() != State_Running)      return;
 
     if (mode == Mode_Stop) {
         /* 可控停机模式：给定按本次斜率（受控/急停）往 0 收 */
-        int32_t step = tasks->stop_step_q24;
-        if      (speed_ref_q24 >  step) speed_ref_q24 -= step;
-        else if (speed_ref_q24 < -step) speed_ref_q24 += step;
-        else                            speed_ref_q24  = 0;
+        speed_ref_q24 = lt_ramp_update(RAMP_SPEED_IDX);
 
         /* 速度给定收到 0、且实测速度也进了窗口 → 清占空比（此刻反电势已可忽略），进 Stop */
         if (speed_ref_q24 == 0 &&
@@ -424,11 +479,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
 
         /* 斜坡速度：目标按 SPEED_RAMP_STEP_Q24 逼近，阶跃指令不产生冲击 */
         if (mode == Mode_Ramp_Speed) {
-            int64_t d = (int64_t)tasks->target - (int64_t)tasks->speed_ramp_q24;   /* int64：两个 int32 相减会溢出（有符号 UB） */
-            if (d > SPEED_RAMP_STEP_Q24)        tasks->speed_ramp_q24 += SPEED_RAMP_STEP_Q24;
-            else if (d < -SPEED_RAMP_STEP_Q24)  tasks->speed_ramp_q24 -= SPEED_RAMP_STEP_Q24;
-            else                                tasks->speed_ramp_q24  = tasks->target;
-            speed_ref_q24 = tasks->speed_ramp_q24;
+            speed_ref_q24 = lt_ramp_update(RAMP_SPEED_IDX);
         }
     }
     /* 速度模式：speed_ref_q24 由 control_tasks_set 直接写；
@@ -495,11 +546,8 @@ static void position_loop_task(void)
                      pos_q24 >= tasks->target - POS_WIN_Q24) ? 1 : 0;
     lt_pid_set_target(PID_POS, cmd_q24);
     int32_t speed_q24 = lt_pd_update(PID_POS, pos_q24);
-    /* 一阶差分 × 位置环频率：int64 算完再限幅，别让 int32 乘法溢出（UB） */
-    int32_t ff_q24 = (int32_t)lt_clamp_i64(
-        ((int64_t)cmd_q24 - tasks->pos_cmd_prev) * (int32_t)POS_LOOP_HZ,
-        POS_VMAX_Q24, -POS_VMAX_Q24);
-    tasks->pos_cmd_prev = cmd_q24;
+    /* 速度前馈直接用规划器的速度指令：和位置指令同一拍，不带 1 count 差分的量化噪声 */
+    int32_t ff_q24 = lt_scurve_get_vel(SCURVE_IDX);
 
     /* 前馈叠加后再限幅 */
     tasks->speed_ref_q24 = lt_clamp_i32(speed_q24 + ff_q24, POS_VMAX_Q24, -POS_VMAX_Q24);

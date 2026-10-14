@@ -31,7 +31,19 @@
 #define I_BASE_A                            (float)LTM_ADC_FULL_SCALE_CURRENT_A   /* 电流标幺基准（A） */
 #define VBUS_BASE_V                         (float)LTM_ADC_FULL_SCALE_VOLTAGE_V   /* 母线电压标幺基准（V）*/
 #define V_B_NOM_V                           (V_BUS_NOM_V / _SQRT_3)               /* 母线/√3 = 1.0pu，13.86V */
-#define ZERO_FIND_DUTY_Q15                  (int32_t)((ZERO_FIND_DUTY * Q15_PU))  /* 预定位占空比 */
+/* 电流环输出限幅：0.95 pu（Q15）。每轴限幅和矢量限幅均用此值，
+ * 使 PI 的抗饱和上限与真实可输出电压对齐；给调制/死区留余量。 */
+#define CURR_V_LIM_PU                       0.95f
+#define CURR_V_LIM_Q15                      ((int32_t)(CURR_V_LIM_PU * Q15_PU))
+
+/* 循环里那句每轴夹幅：只是外接方框，
+ * 防 mag2 顶出 32 位；真正的矢量限幅在 lt_foc_update 里做（1.0 pu 圆） */
+
+#define ZERO_FIND_DUTY_Q15                  (int32_t)((ZERO_FIND_DUTY * Q15_PU))  /* 预定位强拖电压 */
+/* 预定位强拖：1ms 一步、the 按 count 口径走（the = 机械 count x PP，满电周期 = MOTOR_CPR 个 the 单位）*/
+#define ZERO_SWEEP_THE_STEP                 ((uint32_t)((MOTOR_CPR + ZERO_SWEEP_TICKS_PER_ELEC / 2U) / ZERO_SWEEP_TICKS_PER_ELEC))
+#define ZERO_SWEEP_POINTS                   ((uint16_t)(ZERO_SWEEP_ELEC_TURNS * ZERO_SWEEP_TICKS_PER_ELEC))
+
 /* ---- 三环整定（标幺域）----
  * 对象：电流环 1/(Ls·s+Rs) 对消成 ωc/s；速度环 iq_pu→speed_pu 是纯积分，增益
  *       K = Kt·I_BASE/(J·2π)；位置环是 1/s（速度环快 10 倍，按理想内环算）。*/
@@ -105,7 +117,6 @@
 #define PCT_TO_Q15(x)       ((int32_t)((x) * ((float)Q15_PU / 100.0f)))          /* % → Vq Q15 */
 #define RPM_TO_Q24(x)       ((int32_t)((x) * ((float)Q24_PU / 60.0f)))           /* RPM → 速度 Q24 */
 #define DEG_TO_Q24(x)       ((int32_t)((x) * ((float)Q24_PU / 360.0f)))          /* ° → 位置 Q24 */
-
 
 /* ============ 允许的 target 范围（控制域 Q 格式）============ */
 #define TARGET_TORQUE_MAX_Q15               A_TO_IQ15(TARGET_TORQUE_MAX_A)      /* 转矩：对应 iq Q15 */

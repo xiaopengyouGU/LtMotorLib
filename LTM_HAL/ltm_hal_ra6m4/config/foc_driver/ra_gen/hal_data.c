@@ -95,7 +95,7 @@ const adc_window_cfg_t g_adc1_window_cfg =
 #endif
 const adc_channel_cfg_t g_adc1_channel_cfg =
 {
-    .scan_mask           = ADC_MASK_CHANNEL_0 |  0,
+    .scan_mask           = ADC_MASK_CHANNEL_0 | ADC_MASK_CHANNEL_16 |  0,
     .scan_mask_group_b   =  0,
     .priority_group_a    = ADC_GROUP_A_GROUP_B_RESTART_SCAN,
     .add_mask            =  0,
@@ -121,7 +121,7 @@ const adc_extended_cfg_t g_adc0_cfg_extend =
     .add_average_count   = ADC_ADD_OFF,
     .clearing            = ADC_CLEAR_AFTER_READ_ON,
     .trigger             = ADC_START_SOURCE_ELC_AD0 /* AD0 for Group A. AD1 for Group B */,
-    .trigger_group_b     = ADC_START_SOURCE_ELC_AD1 /* AD0 for Group A. AD1 for Group B */,
+    .trigger_group_b     = ADC_START_SOURCE_DISABLED,
     .double_trigger_mode = ADC_DOUBLE_TRIGGER_DISABLED,
     .adc_vref_control    = ADC_VREF_CONTROL_VREFH,
     .enable_adbuf        = 0,
@@ -141,7 +141,7 @@ const adc_extended_cfg_t g_adc0_cfg_extend =
 const adc_cfg_t g_adc0_cfg =
 {
     .unit                = 0,
-    .mode                = ADC_MODE_GROUP_SCAN,
+    .mode                = ADC_MODE_SINGLE_SCAN,
     .resolution          = ADC_RESOLUTION_12_BIT,
     .alignment           = (adc_alignment_t) ADC_ALIGNMENT_RIGHT,
     .trigger             = (adc_trigger_t)0xF, // Not used
@@ -182,8 +182,8 @@ const adc_window_cfg_t g_adc0_window_cfg =
 #endif
 const adc_channel_cfg_t g_adc0_channel_cfg =
 {
-    .scan_mask           = ADC_MASK_CHANNEL_1 |  0,
-    .scan_mask_group_b   = ADC_MASK_CHANNEL_3 | ADC_MASK_CHANNEL_7 |  0,
+    .scan_mask           = ADC_MASK_CHANNEL_1 | ADC_MASK_CHANNEL_3 | ADC_MASK_CHANNEL_7 |  0,
+    .scan_mask_group_b   =  0,
     .priority_group_a    = ADC_GROUP_A_GROUP_B_CONTINUOUS_SCAN,
     .add_mask            =  0,
     .sample_hold_mask    =  0,
@@ -278,8 +278,8 @@ const gpt_extended_cfg_t g_timer3_extend =
     .compare_match_f_irq   = FSP_INVALID_VECTOR,
 #endif
      .compare_match_value = { (uint32_t)0x0, /* CMP_A */(uint32_t)0x0, /* CMP_B */(uint32_t)0x0, /* CMP_C */(uint32_t)0x0, /* CMP_D */(uint32_t)0x0, /* CMP_E */(uint32_t)0x0, /* CMP_F */ }, .compare_match_status = ((0U << 5U) | (0U << 4U) | (0U << 3U) | (0U << 2U) | (0U << 1U) | 0U),
-    .capture_filter_gtioca = GPT_CAPTURE_FILTER_NONE,
-    .capture_filter_gtiocb = GPT_CAPTURE_FILTER_NONE,
+    .capture_filter_gtioca = GPT_CAPTURE_FILTER_PCLKD_DIV_16,
+    .capture_filter_gtiocb = GPT_CAPTURE_FILTER_PCLKD_DIV_16,
 #if 0
     .p_pwm_cfg             = &g_timer3_pwm_extend,
 #else
@@ -291,15 +291,15 @@ const gpt_extended_cfg_t g_timer3_extend =
     .gtior_setting.gtior_b.oahld  = 0U,
     .gtior_setting.gtior_b.oae    = (uint32_t) false,
     .gtior_setting.gtior_b.oadf   = (uint32_t) GPT_GTIOC_DISABLE_PROHIBITED,
-    .gtior_setting.gtior_b.nfaen  = ((uint32_t) GPT_CAPTURE_FILTER_NONE & 1U),
-    .gtior_setting.gtior_b.nfcsa  = ((uint32_t) GPT_CAPTURE_FILTER_NONE >> 1U),
+    .gtior_setting.gtior_b.nfaen  = ((uint32_t) GPT_CAPTURE_FILTER_PCLKD_DIV_16 & 1U),
+    .gtior_setting.gtior_b.nfcsa  = ((uint32_t) GPT_CAPTURE_FILTER_PCLKD_DIV_16 >> 1U),
     .gtior_setting.gtior_b.gtiob  = (0U << 4U) | (0U << 2U) | (0U << 0U),
     .gtior_setting.gtior_b.obdflt = (uint32_t) GPT_PIN_LEVEL_LOW,
     .gtior_setting.gtior_b.obhld  = 0U,
     .gtior_setting.gtior_b.obe    = (uint32_t) false,
     .gtior_setting.gtior_b.obdf   = (uint32_t) GPT_GTIOC_DISABLE_PROHIBITED,
-    .gtior_setting.gtior_b.nfben  = ((uint32_t) GPT_CAPTURE_FILTER_NONE & 1U),
-    .gtior_setting.gtior_b.nfcsb  = ((uint32_t) GPT_CAPTURE_FILTER_NONE >> 1U),
+    .gtior_setting.gtior_b.nfben  = ((uint32_t) GPT_CAPTURE_FILTER_PCLKD_DIV_16 & 1U),
+    .gtior_setting.gtior_b.nfcsb  = ((uint32_t) GPT_CAPTURE_FILTER_PCLKD_DIV_16 >> 1U),
 #else
     .gtior_setting.gtior = 0U,
 #endif

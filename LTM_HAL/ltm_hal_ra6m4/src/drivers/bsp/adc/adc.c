@@ -81,26 +81,32 @@ void adc_calibrate_zero(uint16_t samples)           /* 校准零点（软件触�
     adc->calib_tar  = samples;                      /* 更新校准采样次数目标值 */
 }
 
-/* 获取电流采样值，由AB相重构C相电流 */
 void adc_get_current(int32_t *Ia, int32_t *Ib, int32_t *Ic)
 {
-    if (!Ia || !Ib || !Ic)                return;  /* 判空 */
+    if (!Ia || !Ib || !Ic) return;
+
     uint16_t *curr_buf = adc->curr_buf;
     int32_t  *offset   = adc->offset;
-    /* 读取三相电流，扣除零点漂移，转换为电流值(Q15)：0 电流在 offset，单边满量程
-     * 2048 count，左移 4 位即 1.0 pu = 32768；下桥臂采样，电流方向与占空比相反，取负 */
-    int32_t ia = - (((int32_t)curr_buf[0] - offset[0]) << 4);
-    int32_t ib = - (((int32_t)curr_buf[1] - offset[1]) << 4);
-	
-	if (!adc->calib_done) {        /* 校准完毕之前，获取的电流按 0 算 */
-		*Ia = 0;
-		*Ib = 0;
-		*Ic = 0;						
-	} else {
-        *Ia = ia;
-        *Ib = ib;
-        *Ic = - (ia + ib);      /* 下桥臂采样、Ia+Ib+Ic=0：与前两相同号即为 Ic */
+
+    if (!adc->calib_done) {
+        *Ia = 0;
+        *Ib = 0;
+        *Ic = 0;
+        return;
     }
+
+    /* 三相各自扣零点、转 Q15，下桥臂采样取负 */
+    int32_t ia = -(((int32_t)curr_buf[0] - offset[0]) << 4);
+    int32_t ib = -(((int32_t)curr_buf[1] - offset[1]) << 4);
+    int32_t ic = -(((int32_t)curr_buf[2] - offset[2]) << 4);
+
+    /* 去共模：cm = (ia+ib+ic)/3，Q15 下用 *10923>>15 替代 /3 */
+    int32_t sum = ia + ib + ic;
+    int32_t cm  = (sum * 10923) >> 15;   /* 10923/32768 ≈ 1/3 */
+
+    *Ia = ia - cm;
+    *Ib = ib - cm;
+    *Ic = ic - cm;
 }
 
 void adc_get_temp(int32_t *motor_temp, int32_t *driver_temp)  /* 获取电机和驱动器温度（0.1℃）*/
@@ -122,11 +128,11 @@ void adc_set_callback(void (*callback)(void))       /* 设置用户 ADC 扫描�
     if (callback)     s_callback = callback;
 }
 
-/* B相电流（IB）扫描完毕回调函数，负责校准和数据搬运 */
+/* BC相电流（IB、IC）扫描完毕回调函数，负责校准和数据搬运 */
 void adc_scan_cplt_callback(adc_callback_args_t *p_arg) /* adc 扫描完毕回调 */
 {   
     /* 软件设置上，中心PWM 下溢时刻触发 ADC 采样（对应下桥臂导通），每周期执行一次（20kHz） */
-    if(p_arg->event != ADC_EVENT_SCAN_COMPLETE) 	return;      /* 非扫描完成中断，直接退出 */      
+    if (p_arg->event != ADC_EVENT_SCAN_COMPLETE) 	return;      /* 非扫描完成中断，直接退出 */      
     #ifdef TEST_LOOP_TIME
         test_gpio_on();
     #endif
@@ -135,6 +141,7 @@ void adc_scan_cplt_callback(adc_callback_args_t *p_arg) /* adc 扫描完毕回�
     uint16_t *temp_buf = adc->temp_buf;
     R_ADC_Read(ctrl,      ADC_CURRENT_A_CHANNEL, &curr_buf[0]);   /* A相电流原始值 */
     R_ADC_Read(adc_ctrl1, ADC_CURRENT_B_CHANNEL, &curr_buf[1]);   /* B相电流原始值 */
+    R_ADC_Read(adc_ctrl1, ADC_CURRENT_C_CHANNEL, &curr_buf[2]);   /* C相电流原始值 */
 
     if (!adc->calib_done){           /* 未校准完毕 */    
         if(adc->calib_tar) {         /* 调用了校准API, 手动启动校准 */
@@ -142,9 +149,11 @@ void adc_scan_cplt_callback(adc_callback_args_t *p_arg) /* adc 扫描完毕回�
             uint16_t count = (++(adc->calib_cnt));
             offset[0] += (int32_t)curr_buf[0];
             offset[1] += (int32_t)curr_buf[1];
+            offset[2] += (int32_t)curr_buf[2];
             if (count >= adc->calib_tar) {
                 offset[0] /= count;
                 offset[1] /= count;
+                offset[2] /= count;
                 adc->calib_done = 1;  /* 校准完毕 */
             }
         }

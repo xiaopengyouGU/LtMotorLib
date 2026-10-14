@@ -12,13 +12,15 @@
  * 以ADC满量程确定电流和母线电压的标幺基准（Q15）
  */
 
-/* ADC 引脚通道映射（12bit，双 ADC 同步采样）：
+/* ADC 引脚通道映射（12bit，双ADC 同步采样）：
  *   IA -> ADC0_IN1  (P001)
  *   IB -> ADC1_IN0  (P000)
+ *   IC -> ADC1_IN16 (P500)
  * 双ADC在 中心对齐PWM下溢时刻触发采样，对应下桥采样，硬件保证 Ia+Ib+Ic=0。
  */
 #define ADC_CURRENT_A_CHANNEL       ADC_CHANNEL_1       /* P001：A 相电流 -> ADC0 */
 #define ADC_CURRENT_B_CHANNEL       ADC_CHANNEL_0       /* P000：B 相电流 -> ADC1 */
+#define ADC_CURRENT_C_CHANNEL       ADC_CHANNEL_16      /* P500：C 相电流 -> ADC1 */
 #define ADC_VBUS_CHANNEL            ADC_CHANNEL_3       /* P003：母线电压 -> ADC0 */
 #define ADC_TEMP_DRIVER_CHANNEL     ADC_CHANNEL_7       /* P007：驱动器温度 -> ADC0 */
 // #define ADC_TEMP_MOTOR_CHANNEL      ADC_CHANNEL_9       /* P009：电机温度 -> ADC0 */

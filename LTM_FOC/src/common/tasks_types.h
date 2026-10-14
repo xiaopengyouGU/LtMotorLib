@@ -20,7 +20,10 @@ typedef struct {
     tasks_mode_t  mode;
     tasks_state_t state;
     lt_err_t      err;          /* 保护错误码（首错锁存）*/
-} tasks_info_t;
+    /* 上电零点自检（一次性，排查预定位用）*/
+    int32_t       zero_end;      /* 预定位实测零点（count）*/
+    int32_t       zero_spread;   /* 末段采样峰峰值（count）：判转子有没有真停稳 */
 
+} tasks_info_t;
 
 #endif

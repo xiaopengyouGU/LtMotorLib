@@ -65,8 +65,10 @@ typedef struct {
     lt_motor_mode_t  mode;       /* 运行模式 */
     lt_motor_state_t state;      /* 电机状态 */
     lt_err_t  err;               /* 保护错误码：LT_OK = 正常，其他见 lt_err_t（首错锁存）*/
+    /* 上电零点自检（一次性，排查预定位用）*/
+    int32_t zero_end;            /* 预定位实测零点（count）*/
+    int32_t zero_spread;         /* 末段采样峰峰值（count）*/
+
 } lt_motor_info_t;
-
-
 
 #endif

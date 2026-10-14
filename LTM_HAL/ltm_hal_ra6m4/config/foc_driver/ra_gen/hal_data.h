@@ -38,7 +38,7 @@ void adc_scan_cplt_callback(adc_callback_args_t * p_args);
 #endif
 
 #ifndef NULL
-#define ADC_DMAC_CHANNELS_PER_BLOCK_NULL  1
+#define ADC_DMAC_CHANNELS_PER_BLOCK_NULL  2
 #endif
 /** ADC on ADC Instance. */
 extern const adc_instance_t g_adc0;
@@ -53,7 +53,7 @@ void NULL(adc_callback_args_t * p_args);
 #endif
 
 #ifndef NULL
-#define ADC_DMAC_CHANNELS_PER_BLOCK_NULL  1
+#define ADC_DMAC_CHANNELS_PER_BLOCK_NULL  3
 #endif
 /** Timer on GPT Instance. */
 extern const timer_instance_t g_timer3;

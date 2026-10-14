@@ -77,6 +77,14 @@ int main(void)
     }
     ltm_commut_printf("LTM_FOC ready! T=A / V=RPM / RV=RPM / P=deg / S / ES, H for help\r\n");
 
+    /* 上电零点：实测零点 + 读点采样峰峰值（没停稳就大）*/
+    {
+        lt_motor_info_t zi;
+        lt_motor_get_info(&zi);
+        ltm_commut_printf("zero: off=%d spread=%d\r\n",
+                          (int)zi.zero_end, (int)zi.zero_spread);
+    }
+
     lt_motor_info_t info;
     uint8_t data_type, data[128];
     uint16_t data_len;

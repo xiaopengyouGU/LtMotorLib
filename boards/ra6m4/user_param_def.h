@@ -20,6 +20,7 @@
 #define SPEED_LOOP_HZ                       4000U       /* 速度环频率（Hz）：默认4kHz */
 #define POS_LOOP_HZ                         1000U       /* 位置环频率（Hz）：默认1kHz */
 #define SPEED_DIV                           5U          /* 速度环 20k/5  = 4kHz */
+#define PLL_DIV                             1U          /* 测速分频：PLL 更新率 = 电流环 / PLL_DIV */
 #define POS_DIV                             20U         /* 位置环 20k/20 = 1kHz */
 #define V_BUS_NOM_V                         24.0f       /* 整定用的设计母线 */
 /* 三环带宽 */
@@ -29,7 +30,17 @@
 #define CUR_FB_IIR_SHIFT                   1           /* 电流反馈一阶 IIR：y+=(x-y)>>N，只进 PI/前馈；N=1 时 20kHz 下 fc≈2.3kHz，800Hz 穿越处相移 -14° */
 #define SPEED_REP_IIR_SHIFT                5           /* 上报速度一阶 IIR：y+=(x-y)>>N，只滤上报曲线，不进环路 */
 #define SPEED_IQ_LIMIT                      7.6f        /* 速度环输出限幅 ±7.6A，避免触发过流保护 */
-#define ANGEL_DELAY_STEP                    0           /* 是否有角度测量一拍延迟，1：有，0：无 */
+#define ANGLE_DELAY_STEP                    0           /* 是否有角度测量一拍延迟，1：有，0：无 */
+#define DQ_DECOUPLE                         1           /* dq 解耦前馈：1=开 0=关（高速失稳排查用）*/
+
+/* ============ 死区补偿（电流极性法，Q15 标幺）============ */
+#define DZ_ENABLE                           1       /* 1=开 0=关 */
+#define DZ_DEAD_DUTY_Q15                    655     /* 死区 1us/50us = 2% × 32768 */
+#define DZ_ITH_Q15                          64      /* 极性判别阈值：64 Q15 count = 27mA，约 4 个 ADC LSB（1 LSB=6.71mA）；须明显大于采样噪声，又不能接近额定（取到额定 1~3% 反而更差） */
+#define DZ_ALPHA_SHIFT                      1       /* 差模补偿一阶低通 α = 1/2 */
+#define DZ_DIR_A                            -1       /* 电流方向与 PWM 正占空比：1 同向 / -1 反向 */
+#define DZ_DIR_B                            -1
+#define DZ_DIR_C                            -1
 /* 锁相环：PLL测速 在电流环里跑，f_n = 300Hz、ζ=0.7（取速度环 60Hz 的 5 倍）
  * Kp = 4πζ·f_n、Ki = (2π·f_n)²/freq */
 #define PLL_KP                              2639
@@ -40,10 +51,11 @@
 #define TARGET_SPEED_MAX_RPM                3000.0f         /* 速度模式：±3000RPM */
 #define TARGET_POS_MAX_DEG                  (100 * 360.0f)  /* 位置模式：±100 圈（最大只允许±120圈）*/
 /* ============ 转子预定位参数 ============ */
-#define ZERO_FIND_DUTY                      0.10f       /* 预定位占空比 */
-#define ZERO_ALIGN_HOLD_MS                  400         /* 预定位时长 */
-#define ZERO_ALIGN_AVG                      8           /* 末段取点数 */
-
+#define ZERO_FIND_DUTY                      0.05f       /* 预定位 D 轴强拖电压幅值（pu，1.0 = 母线/√3）*/
+#define ZERO_SWEEP_TICKS_PER_ELEC           1000U       /* 每电周期扫多少步：1ms 一步 */
+#define ZERO_SWEEP_ELEC_TURNS               2U          /* 单方向扫过的电周期数（正反各扫一遍）*/
+#define ZERO_SETTLE_MS                      300         /* D 轴吸住的稳定时间（ms）：停稳后再取零点 */
+#define ZERO_AVG_N                          8           /* 末段取平均的采样点数（1ms 一点）*/
 /* ============ 摩擦力前馈补偿参数 ============ */
 #define FRICTION_FF_ENABLE                  1           /* 速度环库仑摩擦前馈 */
 #define FRICTION_STATIC_CURR                0.18f       /* 静摩擦突破电流（A）*/

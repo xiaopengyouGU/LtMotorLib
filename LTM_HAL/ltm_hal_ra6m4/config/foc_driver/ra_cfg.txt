@@ -200,7 +200,7 @@ FSP Configuration
       P413 19 - - - - Disabled - - "AGT3: AGTEE3; CTSU0: TS09; ETHERC_MII0: ET0_ETXD1; ETHERC_RMII0: RMII_TXD0; GPT_OPS0: GTOUUP; SCI0: CTSRTS0; SDHI0: SD0CLK; SPI1: SSLB0" - None - - 
       P414 18 - - - - Disabled - - "AGT5: AGTIO5; CTSU0: TS10; ETHERC_MII0: ET0_RX_ER; ETHERC_RMII0: RMII_TXD1; GPT0: GTIOC0B; ICU0: IRQ09; SCI0: CTS0; SDHI0: SD0WP; SPI1: SSLB1" - None - - 
       P415 17 - - - - Disabled - - "AGT4: AGTIO4; CTSU0: TS11; ETHERC_MII0: ET0_TX_EN; ETHERC_RMII0: RMII_TXD_EN; GPT0: GTIOC0A; ICU0: IRQ08; SDHI0: SD0CD; SPI1: SSLB2; USB_FS0: USB_VBUSEN" - None - - 
-      P500 76 - - - - Disabled - - "ADC1: AN116; AGT0: AGTOA0; CAC0: CACREF; GPT_OPS0: GTIU; QSPI0: QSPCLK; SCI5: CTS5; USB_FS0: USB_VBUSEN" - None - - 
+      P500 76 ADC1_AN116 - - - "Analog mode" - None "ADC1: AN116; AGT0: AGTOA0; CAC0: CACREF; GPT_OPS0: GTIU; QSPI0: QSPCLK; SCI5: CTS5; USB_FS0: USB_VBUSEN" - IO - - 
       P501 77 - - - - Disabled - - "ADC1: AN117; AGT0: AGTOB0; GPT_OPS0: GTIV; ICU0: IRQ11; QSPI0: QSSL; SCI5: SDA5; SCI5: TXD5; USB_FS0: USB_OVRCURA" - None - - 
       P502 78 - - - - Disabled - - "ADC1: AN118; AGT2: AGTOA2; GPT_OPS0: GTIW; ICU0: IRQ12; QSPI0: QIO0; SCI5: RXD5; SCI5: SCL5; SCI6: CTS6; USB_FS0: USB_OVRCURB" - None - - 
       P503 79 - - - - Disabled - - "ADC1: AN119; AGT2: AGTOB2; GPT_POEG2: GTETRGC; QSPI0: QIO1; SCI5: SCK5; SCI6: CTSRTS6; USB_FS0: USB_EXICEN" - None - - 
@@ -565,8 +565,8 @@ FSP Configuration
       Input: Clear Source: 
       Input: Capture A Source: 
       Input: Capture B Source: 
-      Input: Noise Filter A Sampling Clock Select: No Filter
-      Input: Noise Filter B Sampling Clock Select: No Filter
+      Input: Noise Filter A Sampling Clock Select: Filter PCLKD / 16
+      Input: Noise Filter B Sampling Clock Select: Filter PCLKD / 16
       Pin Polarity: GTIOCnA Polarity: Normal
       Pin Polarity: GTIOCnB Polarity: Normal
       Interrupts: Callback: NULL
@@ -598,12 +598,12 @@ FSP Configuration
       General: Resolution: 12-Bit
       General: Alignment: Right
       General: Clear after read: On
-      General: Mode: Group Scan
+      General: Mode: Single Scan
       General: Double-trigger: Disabled
-      Input: Channel Scan Mask (channel availability varies by MCU): Channel 1
-      Input: Group B Scan Mask (channel availability varies by MCU): Channel 3, Channel 7
+      Input: Channel Scan Mask (channel availability varies by MCU): Channel 1, Channel 3, Channel 7
+      Input: Group B Scan Mask (channel availability varies by MCU): 
       Interrupts: Normal/Group A Trigger: GPT6 COUNTER UNDERFLOW (Underflow)
-      Interrupts: Group B Trigger: GPT6 COUNTER OVERFLOW (Overflow)
+      Interrupts: Group B Trigger: Disabled
       Interrupts: Group Priority (Valid only in Group Scan Mode): Group A can interrupt Group B; Group B scan restarts immediately and scans continuously
       Input: Add/Average Count: Disabled
       Input: Reference Voltage control: VREFH0/VREFH
@@ -640,7 +640,7 @@ FSP Configuration
       General: Clear after read: On
       General: Mode: Single Scan
       General: Double-trigger: Disabled
-      Input: Channel Scan Mask (channel availability varies by MCU): Channel 0
+      Input: Channel Scan Mask (channel availability varies by MCU): Channel 0, Channel 16
       Input: Group B Scan Mask (channel availability varies by MCU): 
       Interrupts: Normal/Group A Trigger: GPT6 COUNTER UNDERFLOW (Underflow)
       Interrupts: Group B Trigger: Disabled

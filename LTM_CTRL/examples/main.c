@@ -110,7 +110,7 @@ int main(void)
             iq_mA  = (int32_t)(((int64_t)iq_q24 * I_BASE_MA) >> 24);
         }
 
-        lt_foc_update(0, (int16_t)((int64_t)iq_mA * 32767 / I_BASE_MA),
+        lt_foc_update(0, ((int32_t)((int64_t)iq_mA * 32767 / I_BASE_MA),
                       pos_count * POLE_PAIRS, dutys);
     }
 

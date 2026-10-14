@@ -29,6 +29,9 @@
             <slot name="P404.CM33" secure="true"/>
             <slot name="P405.CM33" secure="true"/>
         </peripheral>
+        <peripheral name="PORT5.CM33" group="PORT">
+            <slot name="P500.CM33" secure="true"/>
+        </peripheral>
         <peripheral name="PORT6.CM33" group="PORT">
             <slot name="P600.CM33" secure="true"/>
             <slot name="P601.CM33" secure="true"/>
@@ -46,9 +49,6 @@
             <slot name="IRQ2.CM33" secure="true"/>
             <slot name="IRQ3.CM33" secure="true"/>
             <slot name="IRQ4.CM33" secure="true"/>
-        </peripheral>
-        <peripheral name="ELC.CM33">
-            <slot name="ADC0_B.CM33" secure="true"/>
         </peripheral>
     </partition>
 </azone>

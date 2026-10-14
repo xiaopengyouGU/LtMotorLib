@@ -79,6 +79,7 @@ static inline void foc_sin_cos(uint16_t phase, int16_t *s, int16_t *c)
 #define FOC_Q15_SQRT3_2_I32     28378
 #define FOC_Q15_HALF_I32        16384
 #define FOC_Q15_ONE_I32         32768
+#define FOC_Q15_VMAX_I32        46340      /* 圆的外接方框：46340^2*2 < 2^32 */
 #define FOC_Q15_MAX_I32         32767      /* Q15 能表示的上限（正弦表幅值）*/
 /* 过调制 + 零矢量时间（Q15 版，32768 == 1.0）：T1+T2 > 1.0 时等比例缩小，并计算 T0/2 */
 #define SVPWM_SCALE_T0_Q15(T1, T2, T0_half)                                       \
@@ -120,12 +121,26 @@ void lt_foc_set(uint32_t reso)
 /*==============================================================================
  * 纯定点接口：输入 Q15 格式的 D/Q 轴电压指令（1.0 pu = Vdc/√3）和电角度计数
  * the：(单圈编码器原始计数 - 电角度零点偏置) × 极对数，可以加上延迟补偿量 
+ * 限幅放在矢量域：|V| > 1.0 pu 时整体等比缩小，各方向可用电压一致、方向不变；
+ * 正常工况只多一次乘加比较，只有打满时才开方+缩放
  * 相位 = the 先按 step 缩放到 0~65535（对应 0~2π），2^16 截断即自然回绕
  * 内部全程整数运算，热路径无除法、无取模、无浮点
  *==============================================================================*/
-void lt_foc_update(int16_t Vd, int16_t Vq, uint32_t the, int32_t dutys[3])
+void lt_foc_update(int32_t Vd, int32_t Vq, uint32_t the, int32_t dutys[3])
 {
     if (foc->reso == 0) return;                        /* 未设置分辨率，直接返回 */
+
+    /* 矢量域限幅：|V| ≤ 1.0 pu（= Vdc/√3）。逐轴限幅会把方向拧偏——对角线方向
+     * 只能给到 √2 倍量程的一半，这里整体缩放，方向不动。
+     * 先夹到圆外接方框内，保证 mag2 不顶出 32 位（46340² × 2 < 2^32）*/
+    Vd = lt_clamp_i32(Vd, FOC_Q15_VMAX_I32, -FOC_Q15_VMAX_I32);
+    Vq = lt_clamp_i32(Vq, FOC_Q15_VMAX_I32, -FOC_Q15_VMAX_I32);
+    int64_t mag2 = (int64_t)Vd * Vd + (int64_t)Vq * Vq;
+    if (mag2 > (int64_t)FOC_Q15_ONE_I32 * FOC_Q15_ONE_I32) {
+        uint32_t m = lt_sqrt_u32((uint32_t)mag2);
+        Vd = (int32_t)(((int64_t)Vd * FOC_Q15_ONE_I32) / (int32_t)m);
+        Vq = (int32_t)(((int64_t)Vq * FOC_Q15_ONE_I32) / (int32_t)m);
+    }
 
     /* 相位 = the * step >> 16：1 条 MULS + 1 条移位，无除法、无取模
      * 只取 32 位乘积的 bits16~31，2^16 自然截断 == 65536（对应 2π）回绕

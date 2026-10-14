@@ -69,7 +69,7 @@ lt_err_t lt_motor_init(void)
     lt_fsm_init();                      /* 状态机初始化 */
     driver_task_init();                 /* 底层驱动初始化 */
     control_tasks_init();               /* 三环控制任务初始化 */
-        control_tasks_zero_find();      /* 上电电角度零点（内部：calib 吸死 → 存进控制层）*/
+        control_tasks_zero_find();      /* 上电电角度零点：普通预定位（D 轴吸住取末段平均）*/
     /* 零点结果上报接口待定（作者后续改动），这里先只做标定 */
     lt_fsm_update(Event_Init_Done);
     /* 三环任务回调绑定 */
@@ -120,6 +120,9 @@ lt_err_t lt_motor_stop(uint8_t estop)    /* 电机停机：0 受控（25pu/s）�
 
 lt_err_t lt_motor_set(lt_motor_mode_t mode, float target)
 {
+    /* 拒 NaN：它与任何数比较都是假，能瞒过下面所有范围检查，转定点就是垃圾值 */
+    if (!(target == target))    return LT_ERR_OVER_RANGE;
+
     /* IDLE 或 STOP（受控停机已停稳、占空比已清零）都允许切换运行模式 */
     if (mode != control_tasks_get_mode() && lt_fsm_get() != State_Idle && lt_fsm_get() != State_Stop)  return LT_ERR_STATE;
 
@@ -163,5 +166,8 @@ void lt_motor_get_info(lt_motor_info_t *info)
     info->mode   = (lt_motor_mode_t)task.mode;
     info->state  = (lt_motor_state_t)task.state;
     info->err    = task.err;                     /* 保护错误码：LT_OK = 正常 */
+
+    info->zero_end    = task.zero_end;           /* 预定位实测零点（count）*/
+    info->zero_spread = task.zero_spread;        /* 末段采样峰峰值：判是否真停稳 */
     info->target = _target_decode(task.mode, task.target);
 }
