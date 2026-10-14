@@ -75,7 +75,7 @@ int main(void)
         sIa += dIa; sIb += dIb; sIc += dIc;
         ltm_delay_ms(2);
     }
-    ltm_commut_printf("LTM_FOC ready! T=A / V=RPM / RV=RPM / P=deg / S / ES, H for help\r\n");
+    ltm_commut_printf("LTM_FOC ready! T=A / V=RPM / RV=RPM / RT=A / P=deg / S / ES, H for help\r\n");
 
     /* 上电零点：实测零点 + 读点采样峰峰值（没停稳就大）*/
     {
@@ -141,10 +141,11 @@ static void user_help(void)
     /* printf接口单次能打印字符数最多：128字节 */
     ltm_commut_printf("LTM_FOC CMD:\r\n"
                       "  T=<A>     torque mode (Iq, unit A)\r\n"
-                      "  V=<RPM>   speed mode\r\n"
-                      "  RV=<RPM>  ramp speed mode\r\n");
-    ltm_commut_printf("  P=<deg>   position mode\r\n"
-                      "  S         controlled stop (1500 RPM/s)\r\n"
+                      "  RT=<A>    ramp torque mode\r\n");
+    ltm_commut_printf("  V=<RPM>   speed mode\r\n"
+                      "  RV=<RPM>  ramp speed mode\r\n"
+                      "  P=<deg>   position mode\r\n");
+    ltm_commut_printf("  S         controlled stop (1500 RPM/s)\r\n"
                       "  ES        emergency stop (6000 RPM/s)\r\n"
                       "  H / ?     this help\r\n");
 }
@@ -173,6 +174,8 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
                 user_help();
             } else if (len >= 3 && buf[0] == 'R' && buf[1] == 'V' && buf[2] == '=') {
                 user_set_mode(buf + 1, (uint16_t)(len - 1), Mode_Ramp_Speed, "Ramp speed");
+            } else if (len >= 3 && buf[0] == 'R' && buf[1] == 'T' && buf[2] == '=') {
+                user_set_mode(buf + 1, (uint16_t)(len - 1), Mode_Ramp_Torque, "Ramp torque");
             } else if (len >= 2 && buf[0] == 'E' && buf[1] == 'S') {   /* 急停 */
                 lt_motor_stop(1);
                 ltm_commut_printf("E-Stop (6000 RPM/s)\r\n");

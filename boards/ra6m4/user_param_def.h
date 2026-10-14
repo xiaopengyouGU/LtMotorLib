@@ -34,7 +34,7 @@
 #define DQ_DECOUPLE                         1           /* dq 解耦前馈：1=开 0=关（高速失稳排查用）*/
 
 /* ============ 死区补偿（电流极性法，Q15 标幺）============ */
-#define DZ_ENABLE                           1       /* 1=开 0=关 */
+#define DZ_ENABLE                           0       /* 1=开 0=关 */
 #define DZ_DEAD_DUTY_Q15                    655     /* 死区 1us/50us = 2% × 32768 */
 #define DZ_ITH_Q15                          64      /* 极性判别阈值：64 Q15 count = 27mA，约 4 个 ADC LSB（1 LSB=6.71mA）；须明显大于采样噪声，又不能接近额定（取到额定 1~3% 反而更差） */
 #define DZ_ALPHA_SHIFT                      1       /* 差模补偿一阶低通 α = 1/2 */
@@ -76,6 +76,7 @@
 #define POSITION_MAX_SPEED                  1200.0f     /* 位置模式速度上限（RPM）*/
 #define POS_WIN_CNT                         15          /* 位置模式到位窗口：15 count */
 #define SPEED_RAMP_RATE                     900.0f      /* 斜坡速度：目标按此斜率逼近（RPM/s）*/
+#define TORQUE_RAMP_RATE                    1.0f       /* 斜坡转矩：目标按此斜率逼近（A/s）*/
 /* 可控停机：速度给定按此斜率降到 0，实测速度进窗口后才清占空比。*/
 #define STOP_DONE                           3.0f        /* 速度停机窗口：±3RPM */
 #define STOP_RAMP_RATE                      1500.0f     /* 受控停机: 1500RPM/s */

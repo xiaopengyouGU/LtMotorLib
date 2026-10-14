@@ -25,6 +25,7 @@
 #define PID_POS         3U
 #define SCURVE_IDX      0U
 #define RAMP_SPEED_IDX  0U
+#define RAMP_TORQUE_IDX 1U
 
 /* PLL 速度上限（count/s）：单拍脏值不许进角度延迟补偿和解耦前馈，
  * 否则 the 被打飞、转矩方向翻转——就是"莫名反向"的来源 */
@@ -211,9 +212,19 @@ void control_tasks_set(tasks_mode_t mode, int32_t target)
     tasks->target = target;
 
     switch (mode) {
-    case Mode_Torque:                           /* 力矩模式 */
-    case Mode_Ramp_Torque:                      /* 目标就是 iq 给定（Q15），应用层给的是 A */
+    case Mode_Torque:                           /* 力矩模式：目标直通 */
         lt_pid_set_target(PID_IQ, target);
+        lt_pid_set_target(PID_ID, 0);
+        break;
+
+    case Mode_Ramp_Torque:                      /* 斜坡转矩：起点取当前 iq，逐拍逼近 */
+        if (changed) {
+            lt_ramp_start(RAMP_TORQUE_IDX, tasks_info->Iq << TORQUE_RAMP_SHIFT,
+                          target << TORQUE_RAMP_SHIFT, TORQUE_RAMP_STEP_Q8);
+        } else {
+            lt_ramp_set_target(RAMP_TORQUE_IDX, target << TORQUE_RAMP_SHIFT);
+        }
+        lt_pid_set_target(PID_IQ, lt_ramp_get(RAMP_TORQUE_IDX) >> TORQUE_RAMP_SHIFT);
         lt_pid_set_target(PID_ID, 0);
         break;
 
@@ -345,6 +356,7 @@ void control_tasks_clear(void)
     tasks->target         = 0;
     tasks->speed_ref_q24  = 0;
     lt_ramp_reset(RAMP_SPEED_IDX);                 /* 清模块状态，下次起步重建 */
+    lt_ramp_reset(RAMP_TORQUE_IDX);
     tasks->scurve_ready   = 0;
     lt_pid_set_target(PID_SPEED, 0);
     lt_pid_set_target(PID_POS,   0);
@@ -413,6 +425,11 @@ static void current_loop_task(void)                 /* 电流环任务 */
         vd = 0;
     } else {
         vd = lt_pi_update(PID_ID, id_fb);          /* 输出 Q15 电压标幺（1.0 pu = 母线/√3）*/
+        if (tasks->mode == Mode_Ramp_Torque) {
+            /* 斜坡转矩：20kHz 逐拍推 iq 给定，阶跃指令不产生冲击 */
+            lt_pid_set_target(PID_IQ,
+                             lt_ramp_update(RAMP_TORQUE_IDX) >> TORQUE_RAMP_SHIFT);
+        }
         vq = lt_pi_update(PID_IQ, iq_fb);
 #if DQ_DECOUPLE
         /* DQ 交叉前馈解耦：Vd_ff = −we·Ls·Iq、Vq_ff = we·(Ls·Id + ψf)，

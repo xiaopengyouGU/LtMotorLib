@@ -132,6 +132,15 @@ static inline int32_t _out_commit(lt_pid_t pid, int64_t d)
     return (int32_t)(out >> PID_ACC_SH);
 }
 
+/* 位置式输出：覆写累加器（不是累加），限幅后仍存累加器尺度 */
+static inline int32_t _out_set(lt_pid_t pid, int64_t out)
+{
+    if (out > pid->out_max)      out = pid->out_max;
+    else if (out < pid->out_min) out = pid->out_min;
+    pid->out_acc = out;
+    return (int32_t)(out >> PID_ACC_SH);
+}
+
 static inline int64_t _d2_clamp(int64_t d2)
 {
     if (d2 >  PID_D2_LIMIT) return  PID_D2_LIMIT;
@@ -150,17 +159,18 @@ int32_t lt_pi_update(uint8_t idx, int32_t curr_val)     /* 增量式 PI */
     return _out_commit(pid, d);
 }
 
-int32_t lt_pd_update(uint8_t idx, int32_t curr_val)     /* 增量式 PD */
+/* 位置式 PD：out = Kp*e + Kd*(e - e1)，每拍重算、不累加。
+ * 增量式对恒定误差增量为 0，输出冻在旧累加值上；累加器被限幅夹过还会丢掉 P 项信息。
+ * D 项一阶差分夹幅沿用 PID_D2_LIMIT */
+int32_t lt_pd_update(uint8_t idx, int32_t curr_val)
 {
     lt_pid_t pid = _pid(idx);
     if (!pid)   return 0;
 
     int64_t err = (int64_t)pid->target - curr_val;
-    int64_t d2  = _d2_clamp(err - 2 * pid->err + pid->err2);
-    int64_t d   = (int64_t)pid->kp * (err - pid->err) + (int64_t)pid->kd * d2;
-    pid->err2 = pid->err;
-    pid->err  = err;
-    return _out_commit(pid, d);
+    int64_t de  = _d2_clamp(err - pid->err);
+    pid->err = err;
+    return _out_set(pid, (int64_t)pid->kp * err + (int64_t)pid->kd * de);
 }
 
 int32_t lt_pid_update(uint8_t idx, int32_t curr_val)    /* 增量式 PID */

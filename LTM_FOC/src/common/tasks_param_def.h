@@ -95,6 +95,11 @@
 #define POS_VMAX_Q24                        ((int32_t)(POSITION_MAX_SPEED / 60.0f * Q24_PU))
 /* 斜坡速度：目标按此斜率逼近（RPM/s），换成每拍 Q24 增量 */
 #define SPEED_RAMP_STEP_Q24                 ((int32_t)(SPEED_RAMP_RATE / 60.0f * Q24_PU / SPEED_LOOP_HZ))
+/* 斜坡转矩步长（iq Q15）：1A/s 在 20kHz 下每拍仅 0.119 个 count，直接取整为 0，
+ * 故斜坡内部细化 TORQUE_RAMP_SHIFT 位，送出前右移还原 */
+#define TORQUE_RAMP_SHIFT                   8
+#define TORQUE_RAMP_STEP_Q8                 ((int32_t)(TORQUE_RAMP_RATE / I_BASE_A * (float)Q15_PU \
+                                            * (float)(1 << TORQUE_RAMP_SHIFT) / CURRENT_LOOP_HZ))
 /* DQ 解耦前馈系数（Q24）：乘 we(rad/s) 再 >>24 得 Q15 电压；
  * 电流相关项还要乘 Q15 电流（再 >>15），故系数先 ×32768 */
 #define FF_L_Q24                            ((int32_t)((double)MOTOR_LS * I_BASE_A / V_B_NOM_V * Q24_PU * Q15_PU))
