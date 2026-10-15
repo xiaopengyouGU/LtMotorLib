@@ -203,39 +203,48 @@ int32_t lt_scurve_update(uint8_t idx)
         return s->pos;
     }
 
-    /* 1) 刹车判据：算出“以当前 (v, ak) 停到目标还要多少距离”。先把加速度从
-     * |ak| 翻到 -a_dec（k 拍；这段里速度先涨后落，比“速度不变”多走
-     * kk3·k²·(2|ak|-ak_dec)——漏掉它就是大 jerk 下几千 count 的过冲），
-     * 再按 -a_dec 匀减速到收尾速度，最后是 jerk 收尾段。
-     * 两边同乘 2a_dec，系数均在 start 预算，热路径只剩乘法 */
-    int64_t av  = (v > 0) ? v : -v;
-    int64_t kak = (ak > 0) ? ak : -ak;
-    int64_t k   = kak + s->ak_dec;                        /* 加速度翻转段拍数 */
-    int64_t va  = av + (kak - s->ak_dec) * k * s->ramp_v;  /* 翻转结束时的速度 */
-    int64_t lhs = va * va
-                + av * k * s->brake_b
-                + 2 * av * s->brake_b  /* 补两拍行程：判据用的是拍初状态，加上离散量化 */
-                + s->kk3 * k * k * (2 * kak - s->ak_dec)
-                + s->brk_c;
-    int64_t rhs = (d > 0 ? d : -d) * s->brake_a2;
-
+    /* 1) 刹车判断：目标在背后、或剩余距离已经不够停 */
     uint8_t brake;
     if (v == 0) {
         brake = 0;
     } else if (d == 0 || ((v > 0) != (d > 0))) {
         brake = 1;
+    } else if (s->j_step == 0) {
+        /* T 形快速路径：加速度即时给定，刹停距离就是 v²/(2a_dec)，没有翻转段和
+         * jerk 收尾段——梯形不该付 S 形那套 64 位乘的钱 */
+        brake = ((int64_t)v * v >= (d > 0 ? d : -d) * s->brake_a2);
     } else {
-        brake = (lhs >= rhs);
+        /* S 形：算出“以当前 (v, ak) 停到目标还要多少距离”。先把加速度从
+         * |ak| 翻到 -a_dec（k 拍；这段里速度先涨后落，比“速度不变”多走
+         * kk3·k²·(2|ak|-ak_dec)——漏掉它就是大 jerk 下几千 count 的过冲），再按
+         * -a_dec 匀减速到收尾速度，最后是 jerk 收尾段。
+         * 两边同乘 2a_dec，系数均在 start 预算，热路径只剩乘法 */
+        int64_t av  = (v > 0) ? v : -v;
+        int64_t kak = (ak > 0) ? ak : -ak;
+        int64_t k   = kak + s->ak_dec;                        /* 加速度翻转段拍数 */
+        int64_t va  = av + (kak - s->ak_dec) * k * s->ramp_v;  /* 翻转结束时的速度 */
+        int64_t lhs = va * va
+                    + av * k * s->brake_b
+                    + 2 * av * s->brake_b  /* 补两拍行程：判据用的是拍初状态，加上离散量化 */
+                    + s->kk3 * k * k * (2 * kak - s->ak_dec)
+                    + s->brk_c;
+        brake = (lhs >= (int64_t)(d > 0 ? d : -d) * s->brake_a2);
     }
 
     /* 2) 期望加速度（拍数域）*/
     int32_t ak_cmd;
     if (brake) {
-        /* 收尾判据：剩下的 |ak| 拍把加速度收到 0，恰好能把速度收掉
-         * Σa·Ts/1000 = ak²·j_step·Ts/2000。|v| 还大就继续满制动，不大就开始 ramp；
-         * 边收边算、自校正，不依赖进收尾时的速度多准 */
-        int64_t v_ramp = kak * kak * s->ramp_v;
-        ak_cmd = (av > v_ramp) ? ((v > 0) ? -s->ak_dec : s->ak_dec) : 0;
+        if (s->j_step == 0) {
+            ak_cmd = (v > 0) ? -s->ak_dec : s->ak_dec;   /* T 形：ak 就是加速度本身 */
+        } else {
+            /* S 形收尾判据：剩下的 |ak| 拍把加速度收到 0，恰好能把速度收掉
+             * Σa·Ts/1000 = ak²·j_step·Ts/2000。|v| 还大就继续满制动，不大就开始 ramp；
+             * 边收边算、自校正，不依赖进收尾时的速度多准 */
+            int64_t av     = (v > 0) ? v : -v;
+            int64_t kak    = (ak > 0) ? ak : -ak;
+            int64_t v_ramp = kak * kak * s->ramp_v;
+            ak_cmd = (av > v_ramp) ? ((v > 0) ? -s->ak_dec : s->ak_dec) : 0;
+        }
     }
     else if (d == 0)                    ak_cmd = 0;                  /* 已到目标：保持 */
     else if (d > 0 && v >=  s->v_max)   ak_cmd = 0;                  /* 正向巡航 */
