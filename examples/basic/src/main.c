@@ -50,6 +50,20 @@ static const char *err_name(int e)
     }
 }
 
+static const char *mode_name(int m)
+{
+    switch (m) {
+        case Mode_Open_Loop:   return "OpenLoop";
+        case Mode_Position:    return "Position";
+        case Mode_Speed:       return "Speed";
+        case Mode_Torque:      return "Torque";
+        case Mode_Ramp_Speed:  return "RampSpeed";
+        case Mode_Ramp_Torque: return "RampTorque";
+        case Mode_Stop:        return "Stop";
+        default:               return "?";
+    }
+}
+
 int main(void)
 {
     /* 胶水层一键初始化：HAL 外设 + 电流零点校准 + 上电预定位 + 状态机 + 25kHz 三环回调绑定 */
@@ -125,8 +139,9 @@ int main(void)
         /* 定时上报电机状态 */
         if ((count % 2000) == 0) {
             /* 周期报状态：停机/跳保护时能直接从串口看出原因 */
-            ltm_commut_printf("tick=%d state=%s(%d) err=%s(%d) \r\n",
+            ltm_commut_printf("tick=%d state=%s(%d) mode=%s(%d) err=%s(%d) \r\n",
                               (int)count, state_name((int)info.state), (int)info.state,
+                              mode_name((int)info.mode), (int)info.mode,
                               err_name((int)info.err), (int)info.err);
         }
 

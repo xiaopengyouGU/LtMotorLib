@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: MIT
  * lt_speed 主机侧压测（PC，无硬件依赖）
  *
- * 配置：25 kHz 采样、18 位单圈编码器，与 lt_speed_init(262144, 25000) 对应。
+ * 配置：25 kHz 采样、18 位单圈编码器，与 lt_speed_init(idx, type, 262144, 25000) 对应。
  * 默认编译（LT_SPEED_USE_ADAP_M=0）只校验 PLL 通道，并检查接口约定
  * "adap_speed 恒为 0"；用 -DLT_SPEED_USE_ADAP_M=1 编译时两个通道都校验。
  *
@@ -22,6 +22,23 @@
 #endif
 
 #include "ltm_ctrl/lt_control.h"
+
+/* 测速模块池化后是两个实例：0 = PLL、1 = 自适应 M 法。
+ * 本压测沿用老的"单实例双通道"写法，用下面两个壳把两路一起喂/一起取。 */
+#define SPEED_IDX_PLL 0u
+#define SPEED_IDX_M   1u
+
+static void lt_speed_update_all(uint32_t pos_count)
+{
+    lt_speed_update(SPEED_IDX_PLL, pos_count);
+    lt_speed_update(SPEED_IDX_M,   pos_count);
+}
+
+static void lt_speed_get_all(int32_t *adap_speed, int32_t *pll_speed)
+{
+    if (adap_speed) *adap_speed = lt_speed_get(SPEED_IDX_M);
+    if (pll_speed)  *pll_speed  = lt_speed_get(SPEED_IDX_PLL);
+}
 
 /* ==================== 目标配置 ==================== */
 #define ENCODER_CPR      262144u            /* 18 位单圈编码器 */
@@ -99,11 +116,12 @@ static uint32_t encoder_step(encoder_t *enc, double rpm, double noise)
 
 static void speed_start(void)
 {
-    lt_speed_init(ENCODER_CPR, SAMPLE_HZ);
-    lt_speed_set(PLL_KP, PLL_KI);
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, ENCODER_CPR, SAMPLE_HZ);
+    lt_speed_init(SPEED_IDX_M, LT_SPEED_TYPE_ADAP_M, ENCODER_CPR, SAMPLE_HZ);
+    lt_speed_set(SPEED_IDX_PLL, PLL_KP, PLL_KI);
 }
 
-/* lt_speed_get() 输出 count/s，本压测统一换算成 RPM 判定 */
+/* lt_speed_get_all() 输出 count/s，本压测统一换算成 RPM 判定 */
 static double cps_to_rpm(double cps)
 {
     return cps * 60.0 / (double)ENCODER_CPR;
@@ -167,8 +185,8 @@ static void run_profile(double pos0, double seconds, double warmup,
         const double jitter = (noise > 0.0)
             ? (double)(int)(rng_next() % (uint32_t)(2.0 * noise + 1.0)) - noise
             : 0.0;
-        lt_speed_update(encoder_step(&enc, rpm, jitter));
-        lt_speed_get(&adap, &pll);
+        lt_speed_update_all(encoder_step(&enc, rpm, jitter));
+        lt_speed_get_all(&adap, &pll);
         const double adap_rpm = cps_to_rpm((double)adap);
         const double pll_rpm  = cps_to_rpm((double)pll);
 
@@ -254,27 +272,28 @@ static int test_guards(void)
     int32_t adap = -1, pll = -1;
     int ok = 1;
 
-    lt_speed_update(123);                       /* 未初始化就调用 */
-    lt_speed_get(&adap, &pll);
+    lt_speed_update_all(123);                       /* 未初始化就调用 */
+    lt_speed_get_all(&adap, &pll);
     ok &= (adap == 0 && pll == 0);
 
-    lt_speed_set(100, 100);                     /* 未初始化设置增益，应无副作用 */
-    lt_speed_init(0, SAMPLE_HZ);                /* 非法分辨率 */
-    lt_speed_update(0);
-    lt_speed_get(&adap, &pll);
+    lt_speed_set(SPEED_IDX_PLL, 100, 100);                     /* 未初始化设置增益，应无副作用 */
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, 0, SAMPLE_HZ);                /* 非法分辨率 */
+    lt_speed_update_all(0);
+    lt_speed_get_all(&adap, &pll);
     ok &= (adap == 0 && pll == 0);
 
-    lt_speed_init(ENCODER_CPR, 0);              /* 非法频率 */
-    lt_speed_update(0);
-    lt_speed_get(&adap, &pll);
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, ENCODER_CPR, 0);              /* 非法频率 */
+    lt_speed_update_all(0);
+    lt_speed_get_all(&adap, &pll);
     ok &= (adap == 0 && pll == 0);
 
-    lt_speed_init(ENCODER_CPR, SAMPLE_HZ);      /* 正常初始化，首次更新前 */
-    lt_speed_get(&adap, &pll);
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, ENCODER_CPR, SAMPLE_HZ);
+    lt_speed_init(SPEED_IDX_M, LT_SPEED_TYPE_ADAP_M, ENCODER_CPR, SAMPLE_HZ);      /* 正常初始化，首次更新前 */
+    lt_speed_get_all(&adap, &pll);
     ok &= (adap == 0 && pll == 0);
 
-    lt_speed_update(100);                       /* 首拍只做同步，输出仍为 0 */
-    lt_speed_get(&adap, &pll);
+    lt_speed_update_all(100);                       /* 首拍只做同步，输出仍为 0 */
+    lt_speed_get_all(&adap, &pll);
     ok &= (adap == 0 && pll == 0);
 
     printf("\n== 1. 接口保护 ==\n");
@@ -297,8 +316,8 @@ static int test_cold_start(void)
         double max_adap = 0.0, max_pll = 0.0;
         int32_t adap = 0, pll = 0;
         for (int i = 0; i < (int)(0.2 * SAMPLE_HZ); i++) {
-            lt_speed_update(encoder_step(&enc, 0.0, 0.0));
-            lt_speed_get(&adap, &pll);
+            lt_speed_update_all(encoder_step(&enc, 0.0, 0.0));
+            lt_speed_get_all(&adap, &pll);
             const double a = fabs(cps_to_rpm((double)adap));
             const double p = fabs(cps_to_rpm((double)pll));
             if (a > max_adap) max_adap = a;
@@ -319,14 +338,14 @@ static int test_cold_start(void)
         int32_t adap = 0, pll = 0;
         int zero_first = 1;
         for (int i = 0; i < 3; i++) {
-            lt_speed_update(encoder_step(&enc, 30.0, 0.0));
-            lt_speed_get(&adap, &pll);
+            lt_speed_update_all(encoder_step(&enc, 30.0, 0.0));
+            lt_speed_get_all(&adap, &pll);
             if (adap != 0 || pll != 0) zero_first = 0;
         }
         double max_err = 0.0;
         for (int i = 3; i < (int)(2.0 * SAMPLE_HZ); i++) {
-            lt_speed_update(encoder_step(&enc, 30.0, 0.0));
-            lt_speed_get(&adap, &pll);
+            lt_speed_update_all(encoder_step(&enc, 30.0, 0.0));
+            lt_speed_get_all(&adap, &pll);
             if ((double)i >= 0.5 * SAMPLE_HZ) {
                 const double e = fabs(cps_to_rpm((double)pll) - 30.0);
                 if (e > max_err) max_err = e;
@@ -400,8 +419,8 @@ static int test_ramp(void)
     for (int64_t i = 0; i < total; i++) {
         const double t = (double)i / SAMPLE_HZ;
         const double rpm = prof_ramp(t, 0.0);
-        lt_speed_update(encoder_step(&enc, rpm, 0.0));
-        lt_speed_get(&adap, &pll);
+        lt_speed_update_all(encoder_step(&enc, rpm, 0.0));
+        lt_speed_get_all(&adap, &pll);
         if (fabs(cps_to_rpm((double)adap)) > RPM_RANGE_LIMIT ||
             fabs(cps_to_rpm((double)pll))  > RPM_RANGE_LIMIT) bad++;
 
@@ -487,8 +506,8 @@ static int test_steps(void)
 
     for (int64_t i = 0; i < total; i++) {
         int32_t adap = 0, pll = 0;
-        lt_speed_update(encoder_step(&enc, prof_step((double)i / SAMPLE_HZ, 0.0), 0.0));
-        lt_speed_get(&adap, &pll);
+        lt_speed_update_all(encoder_step(&enc, prof_step((double)i / SAMPLE_HZ, 0.0), 0.0));
+        lt_speed_get_all(&adap, &pll);
         adap_buf[i] = cps_to_rpm((double)adap);
         pll_buf[i]  = cps_to_rpm((double)pll);
     }
@@ -549,8 +568,8 @@ static int test_reversal(void)
 
     for (int64_t i = 0; i < total; i++) {
         const double t = (double)i / SAMPLE_HZ;
-        lt_speed_update(encoder_step(&enc, prof_reversal(t, 0.0), 0.0));
-        lt_speed_get(NULL, &pll);
+        lt_speed_update_all(encoder_step(&enc, prof_reversal(t, 0.0), 0.0));
+        lt_speed_get_all(NULL, &pll);
         const double pll_rpm = cps_to_rpm((double)pll);
         if (fabs(pll_rpm) > RPM_RANGE_LIMIT) bad++;
 
@@ -657,8 +676,8 @@ static int test_glitch(void)
     for (int64_t i = 0; i < total; i++) {
         int32_t c = (int32_t)encoder_step(&enc, 100.0, 0.0);
         if (i == glitch_at) c = (int32_t)(((int64_t)c + 5000) % (int64_t)ENCODER_CPR);
-        lt_speed_update((uint32_t)c);
-        lt_speed_get(NULL, &pll);
+        lt_speed_update_all((uint32_t)c);
+        lt_speed_get_all(NULL, &pll);
         const double pll_rpm = cps_to_rpm((double)pll);
         if (fabs(pll_rpm) > RPM_RANGE_LIMIT) bad++;
 
@@ -711,8 +730,9 @@ static double pll_steady(double rpm, uint32_t ki)
 {
     encoder_t enc;
     encoder_init(&enc, 0.0);
-    lt_speed_init(ENCODER_CPR, SAMPLE_HZ);
-    lt_speed_set(PLL_KP, ki);
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, ENCODER_CPR, SAMPLE_HZ);
+    lt_speed_init(SPEED_IDX_M, LT_SPEED_TYPE_ADAP_M, ENCODER_CPR, SAMPLE_HZ);
+    lt_speed_set(SPEED_IDX_PLL, PLL_KP, ki);
 
     const int64_t total = (int64_t)(1.5 * SAMPLE_HZ);
     const int64_t warm  = (int64_t)(0.5 * SAMPLE_HZ);
@@ -721,8 +741,8 @@ static double pll_steady(double rpm, uint32_t ki)
     int32_t pll = 0;
 
     for (int64_t i = 0; i < total; i++) {
-        lt_speed_update(encoder_step(&enc, rpm, 0.0));
-        lt_speed_get(NULL, &pll);
+        lt_speed_update_all(encoder_step(&enc, rpm, 0.0));
+        lt_speed_get_all(NULL, &pll);
         if (i >= warm) { sum += (double)pll; n++; }
     }
     return cps_to_rpm(sum / (double)n);
@@ -778,8 +798,8 @@ static int test_soak(void)
 
         for (int64_t i = 0; i < calls; i++) {
             if ((i % chunk) == 0) chunk_start = now_sec();
-            lt_speed_update((uint32_t)input[i]);
-            lt_speed_get(&adap, &pll);
+            lt_speed_update_all((uint32_t)input[i]);
+            lt_speed_get_all(&adap, &pll);
             if (fabs(cps_to_rpm((double)adap)) > RPM_RANGE_LIMIT ||
                 fabs(cps_to_rpm((double)pll))  > RPM_RANGE_LIMIT) bad[run]++;
             memcpy(&ua, &adap, sizeof(ua));

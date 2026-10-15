@@ -74,10 +74,10 @@ static uint32_t plant_step(plant_t *plant, float iq_a)
 
 static void control_init(void)
 {
-    lt_speed_init(ENCODER_CPR, CURRENT_FREQ);
-    lt_speed_set(PLL_KP, PLL_KI);
+    lt_speed_init(0, LT_SPEED_TYPE_PLL, ENCODER_CPR, CURRENT_FREQ);
+    lt_speed_set(0, PLL_KP, PLL_KI);
 
-    lt_pid_init(SPEED_PID_IDX, 1, SPEED_FREQ);       /* type 1 = Q24 信号 */
+    lt_pid_init(SPEED_PID_IDX, SPEED_FREQ);       /* type 1 = Q24 信号 */
     lt_pid_set(SPEED_PID_IDX, SPEED_KP_Q15, SPEED_KI_Q15, 0);
     lt_pid_set_limits(SPEED_PID_IDX, Q24_ONE, -Q24_ONE);
     lt_pid_set_target(SPEED_PID_IDX, SPEED_TARGET_Q24);
@@ -101,20 +101,20 @@ int main(void)
     const int steps = (int)(SIM_SECONDS * (float)CURRENT_FREQ);
     for (int i = 0; i < steps; i++) {
         pos_count = plant_step(&plant, (float)iq_mA * 0.001f);
-        lt_speed_update(pos_count);
+        lt_speed_update(0, pos_count);
 
         if (i % (int)SPEED_DIV == 0) {
-            lt_speed_get(NULL, &speed_cps);
+            speed_cps = lt_speed_get(0);
             const int32_t speed_q24 = (int32_t)(((int64_t)speed_cps << 24) / SPEED_BASE_CPS);
             iq_q24 = lt_pi_update(SPEED_PID_IDX, speed_q24);
             iq_mA  = (int32_t)(((int64_t)iq_q24 * I_BASE_MA) >> 24);
         }
 
-        lt_foc_update(0, ((int32_t)((int64_t)iq_mA * 32767 / I_BASE_MA),
+        lt_foc_update(0, (int32_t)((int64_t)iq_mA * 32767 / I_BASE_MA),
                       pos_count * POLE_PAIRS, dutys);
     }
 
-    lt_speed_get(NULL, &speed_cps);
+    speed_cps = lt_speed_get(0);
     const float speed_rpm = (float)speed_cps * 60.0f / (float)ENCODER_CPR;
     const float err_rpm   = speed_rpm - (float)TARGET_RPM;
 

@@ -7,6 +7,7 @@
  * 2026-9-27   Lvtou   init 声明信号格式；增益 Q15.15
  * 2026-10-07  Lvtou   去掉 Q15/Q24 分支：误差与增量全 64 位，内部不再区分信号格式
  */
+
 /* lt_pid —— 增量式定点 PID（静态实例池）
  *
  * 信号：Q15（32767 = 1.0）或 Q24（2^24 = 1.0），模块不区分 —— Q24 的误差最坏到
@@ -132,15 +133,6 @@ static inline int32_t _out_commit(lt_pid_t pid, int64_t d)
     return (int32_t)(out >> PID_ACC_SH);
 }
 
-/* 位置式输出：覆写累加器（不是累加），限幅后仍存累加器尺度 */
-static inline int32_t _out_set(lt_pid_t pid, int64_t out)
-{
-    if (out > pid->out_max)      out = pid->out_max;
-    else if (out < pid->out_min) out = pid->out_min;
-    pid->out_acc = out;
-    return (int32_t)(out >> PID_ACC_SH);
-}
-
 static inline int64_t _d2_clamp(int64_t d2)
 {
     if (d2 >  PID_D2_LIMIT) return  PID_D2_LIMIT;
@@ -169,8 +161,13 @@ int32_t lt_pd_update(uint8_t idx, int32_t curr_val)
 
     int64_t err = (int64_t)pid->target - curr_val;
     int64_t de  = _d2_clamp(err - pid->err);
+    int64_t out = (int64_t)pid->kp * err + (int64_t)pid->kd * de;
+    /* 位置式输出：覆写累加器，限幅后仍存累加器尺度 */
     pid->err = err;
-    return _out_set(pid, (int64_t)pid->kp * err + (int64_t)pid->kd * de);
+    if (out > pid->out_max)      out = pid->out_max;
+    else if (out < pid->out_min) out = pid->out_min;
+    pid->out_acc = out;
+    return (int32_t)(out >> PID_ACC_SH);
 }
 
 int32_t lt_pid_update(uint8_t idx, int32_t curr_val)    /* 增量式 PID */
