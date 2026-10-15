@@ -28,8 +28,7 @@
 
 #define     ABS(x)                          ((x) > 0 ? (x) : -(x))
 
-#define     PLL_MIN_SPEED_RPM               1       /* 锁相环允许的最低速度（RPM），只作用于输出 */
-#define     PLL_STOP_SHIFT                  3       /* 停机判定死区 = 最低速度 >> 3 = 1/8 RPM（由 pll_min_q16 移位得到，不占变量）*/
+#define     PLL_MIN_SPEED_DRPM              5       /* 锁相环最低速度（0.1RPM 为单位，5 = 0.5 RPM），只作用于输出 */
 #define     PLL_STOP_TIME_DEN               4       /* 停机判定时间 0.25 s = 1/4 s */
 #define     M_MIN_SPEED_RPM                 4       /* M 法可用下限（RPM）：各档按自己的窗口拍数折算成最少脉冲数 */
 #define     T_WIN_TICKS               30      /* T 法目标窗口（拍）= 1.5ms @20k：延迟压到 PLL 量级，环路带宽才守得住 */
@@ -170,6 +169,13 @@ static int32_t _rpm_to_tick_q16(uint32_t rpm, int32_t reso, uint32_t freq)
 {
     if (freq == 0) return 0;
     return (int32_t)(((int64_t)rpm * reso << SPEED_FRAC) / (60 * (int64_t)freq));
+}
+
+/* 0.1RPM → 内部 counts/tick(Q16)：drpm/600×reso/freq×2^16 */
+static int32_t _drpm_to_tick_q16(uint32_t drpm, int32_t reso, uint32_t freq)
+{
+    if (freq == 0) return 0;
+    return (int32_t)(((int64_t)drpm * reso << SPEED_FRAC) / (600 * (int64_t)freq));
 }
 
 /* 按速度反查分档（只取降档阈值，滞环由 M 法状态机负责），两个估计器共用同一套区间 */
@@ -352,7 +358,7 @@ uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq)
 #endif
         tab->down_q16[i]  = _rpm_to_tick_q16(win_config[i].speed_down, reso, freq);
     }
-    cfg->pll_min_q16 = _rpm_to_tick_q16(PLL_MIN_SPEED_RPM, reso, freq);
+    cfg->pll_min_q16 = _drpm_to_tick_q16(PLL_MIN_SPEED_DRPM, reso, freq);
     cfg->stop_ticks  = (uint16_t)(freq / PLL_STOP_TIME_DEN);                    /* 0.25 s 对应的拍数 */
 
 #if LT_SPEED_USE_ADAP_M
@@ -496,8 +502,8 @@ void lt_speed_update(uint8_t idx, uint32_t pos_count)
     speed_pll = _lpf_q16(speed_out, speed_pll,
                               tab->alpha_num[pband], tab->alpha_shift[pband]);
 
-    /* 停机防漂移：输出持续为 0 超过 0.25 s → 清积分器 */
-    if (ABS(speed_pll) < (cfg->pll_min_q16 >> PLL_STOP_SHIFT)) {
+    /* 停机防漂移：输出持续低于速度死区超过 0.25 s → 清积分器 */
+    if (ABS(speed_pll) < cfg->pll_min_q16) {   /* 停机门槛 = 速度死区，不再另取 1/8 */
         if (pll->stop_cnt < cfg->stop_ticks)    pll->stop_cnt++;
         else { 
             speed_est = 0; 

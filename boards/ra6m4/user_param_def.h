@@ -24,7 +24,7 @@
 #define POS_DIV                             20U         /* 位置环 20k/20 = 1kHz */
 #define V_BUS_NOM_V                         24.0f       /* 整定用的设计母线 */
 /* 三环带宽 */
-#define CURRENT_LOOP_BW                     800.0f      /* 电流环带宽（Hz）*/
+#define CURRENT_LOOP_BW                     1000.0f     /* 电流环带宽（Hz）*/
 #define SPEED_LOOP_BW                       60.0f       /* 速度环带宽（Hz）*/
 #define POS_LOOP_BW                         8.0f        /* 位置环带宽（Hz）*/
 #define CUR_FB_IIR_SHIFT                   1           /* 电流反馈一阶 IIR：y+=(x-y)>>N，只进 PI/前馈；N=1 时 20kHz 下 fc≈2.3kHz，800Hz 穿越处相移 -14° */
@@ -36,7 +36,10 @@
 /* ============ 死区补偿（电流极性法，Q15 标幺）============ */
 #define DZ_ENABLE                           0       /* 1=开 0=关 */
 #define DZ_DEAD_DUTY_Q15                    655     /* 死区 1us/50us = 2% × 32768 */
-#define DZ_ITH_Q15                          64      /* 极性判别阈值：64 Q15 count = 27mA，约 4 个 ADC LSB（1 LSB=6.71mA）；须明显大于采样噪声，又不能接近额定（取到额定 1~3% 反而更差） */
+#define DZ_ITH_Q15                          286     /* 极性判别阈值：286 Q15 count = 0.12A（约 0.87% 额定）。
+                                                        阈值内补偿量与电流线性（TI 那套 linear region）：
+                                                        带宽→零电流处补偿被削弱、极性不翻不叫；
+                                                        带窄（27mA）→带内强、但噪声区会翻极性 */
 #define DZ_ALPHA_SHIFT                      1       /* 差模补偿一阶低通 α = 1/2 */
 #define DZ_DIR_A                            -1       /* 电流方向与 PWM 正占空比：1 同向 / -1 反向 */
 #define DZ_DIR_B                            -1
@@ -55,7 +58,13 @@
 #define TARGET_SPEED_MAX_RPM                3000.0f         /* 速度模式：±3000RPM */
 #define TARGET_POS_MAX_DEG                  (100 * 360.0f)  /* 位置模式：±100 圈（最大只允许±120圈）*/
 /* ============ 转子预定位参数 ============ */
-#define ZERO_FIND_DUTY                     0.10f       /* 预定位 D 轴强拖幅值（pu）：1.0 = 母线/sqrt3。0.05 时命令电压 0.69V 与死区误差 0.48V 同量级，实际电流不定 -> 对齐点乱跑 */
+#define ZERO_FIND_DUTY                     0.07f       /* 预定位 D 轴强拖幅值（pu）：1.0 = 母线/sqrt3。
+                                                       0.10 约 1.39V/0.235Ω ≈ 5.9A，上电就顶驱动器硬件过保；
+                                                       0.05 只有 0.69V，与死区误差 0.48V 同量级、对齐点会乱跑。
+                                                       0.07 约 0.97V ≈ 4.1A，留出过保余量 */
+#define ZERO_RAMP_UP_MS                     500         /* 预定位软启动：D 轴电压 0→设定值用时（ms）。
+                                                       直接给满会把老化功率级顶跳 */
+#define ZERO_RAMP_DOWN_MS                   200         /* 预定位收尾软关断：D 轴电压→0 用时（ms）*/
 #define ZERO_SWEEP_TICKS_PER_ELEC           1000U       /* 每电周期扫多少步：1ms 一步 */
 #define ZERO_SWEEP_ELEC_TURNS               2U          /* 单方向扫过的电周期数（正反各扫一遍）*/
 #define ZERO_SETTLE_MS                      300         /* D 轴吸住的稳定时间（ms）：停稳后再取零点 */
@@ -64,7 +73,7 @@
 #define FRICTION_FF_ENABLE                  1           /* 速度环库仑摩擦前馈 */
 #define FRICTION_STATIC_CURR                0.18f       /* 静摩擦突破电流（A）*/
 #define FRICTION_VISCOUS                    0.00003f    /* 粘性摩擦系数（A/RPM）*/
-#define FRICTION_FF_DEADBAND                1.0f       /* 前馈死区（RPM）：低于此速不给前馈，防零速抖振 */
+#define FRICTION_FF_DEADBAND                10.0f      /* 前馈死区（RPM）：低于此速不给前馈，防零速抖振 */
 
 /* ============ 电机保护参数 ============ */
 #define OC_CURRENT                          11.0f       /* 过流保护触发：±11A */
@@ -79,7 +88,7 @@
 #define POSITION_ACCEL_RATE                 600.0f      /* 梯形加减速斜率（RPM/s）*/
 #define POSITION_MAX_SPEED                  1200.0f     /* 位置模式速度上限（RPM）*/
 #define POS_WIN_CNT                         15          /* 位置模式到位窗口：15 count */
-#define POS_SCURVE_TYPE                     1           /* 位置规划器加减速：0 = T 形，1 = S 形（加速度按 jerk 渐变）*/
+#define POS_SCURVE_TYPE                     0           /* 位置规划器加减速：0 = T 形，1 = S 形（加速度按 jerk 渐变）*/
 #define POS_JERK_MS                         300         /* S 形 jerk 段时长（ms）：加速度 0→满 用多久；相对 2000ms 斜坡取 10~25% 才看得出 S */
 #define SPEED_RAMP_RATE                     900.0f      /* 斜坡速度：目标按此斜率逼近（RPM/s）*/
 #define TORQUE_RAMP_RATE                    1.0f       /* 斜坡转矩：目标按此斜率逼近（A/s）*/
