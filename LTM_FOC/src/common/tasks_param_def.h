@@ -60,7 +60,15 @@
 #define SPEED_PLANT_K                       ((double)MOTOR_KT * I_BASE_A / ((double)MOTOR_J * _2_PI))
 #define SPEED_LOOP_WN                       (SPEED_LOOP_WC / 2.93790)
 #define SPEED_KP_Q15                        ((int32_t)(3.0f * SPEED_LOOP_WN / SPEED_PLANT_K * Q15_PU))
-#define SPEED_KI_Q15                        ((int32_t)(SPEED_LOOP_WN * SPEED_LOOP_WN / SPEED_PLANT_K * Q15_PU))
+#define SPEED_KI_Q15                    ((int32_t)(SPEED_LOOP_WN * SPEED_LOOP_WN / SPEED_PLANT_K * Q15_PU))
+/* 低速用 T 法测速：反馈切换阈值（count/s）与对应的速度环带宽 */
+#define SPD_T_ON_CPS                    ((int32_t)(SPD_T_ON_RPM / 60.0f * MOTOR_CPR))
+#define SPD_T_OFF_CPS                   ((int32_t)(SPD_T_OFF_RPM / 60.0f * MOTOR_CPR))
+#define SPD_T_BLIND_CPS                 ((int32_t)(SPD_T_BLIND_RPM / 60.0f * MOTOR_CPR))
+#define SPEED_LOOP_WC_T                 (_2_PI * SPEED_T_LOOP_BW)
+#define SPEED_LOOP_WN_T                 (SPEED_LOOP_WC_T / 2.93790)
+#define SPEED_KP_T_Q15                  ((int32_t)(3.0f * SPEED_LOOP_WN_T / SPEED_PLANT_K * Q15_PU))
+#define SPEED_KI_T_Q15                  ((int32_t)(SPEED_LOOP_WN_T * SPEED_LOOP_WN_T / SPEED_PLANT_K * Q15_PU))
 /* 位置环PD：ωc = 2π·8，微分零点放 2×ωc（约 27° 超前），
  * Kp = ωc/√(1+(ωc/ωz)²)、Kd = Kp/ωz。D 项吃编码器量化：1 count 抖动在 1kHz
  * 位置环下折合 Kd×0.1pu ≈ 2.7RPM 的速度给定毛刺，别再往上加了 */

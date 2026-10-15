@@ -23,6 +23,8 @@
 #define PID_IQ          1U
 #define PID_SPEED       2U
 #define PID_POS         3U
+#define SPD_IDX_PLL     0U      /* 测速池：PLL */
+#define SPD_IDX_T       1U      /* 测速池：T 法 */
 #define SCURVE_IDX      0U
 #define RAMP_SPEED_IDX  0U
 #define RAMP_TORQUE_IDX 1U
@@ -44,6 +46,7 @@ typedef struct {
     int32_t      speed_ref_q24;             /* 速度给定（Q24 圈/s）*/
     uint8_t      scurve_ready;              /* 位置规划器已启动 */
     uint8_t      in_pos;                    /* 位置到位指示 */
+    uint8_t      spd_use_t;              /* 速度反馈源：1 = T 法，0 = PLL */
     int32_t      ph_i_q15[3];               /* 本拍三相电流，死区补偿用 */
     int32_t      id_flt, iq_flt;            /* 电流反馈滤波状态（Q15），只给 PI/前馈 */
     int32_t      speed_rep_flt;             /* 上报速度低通状态（count/s）*/
@@ -97,20 +100,19 @@ void control_tasks_zero_find(void)
 {
     int32_t  dutys[3];
     uint32_t the = 0U;
-    int32_t  c_ref = 0, c_prev = 0, disp = 0, d_min = 0, d_max = 0;
-    int64_t  sum = 0;
-    uint16_t n;
-    uint8_t  i;
+    int32_t  c_ref = 0, c_prev = 0;
+    int32_t  disp  = 0, d_min  = 0, d_max = 0;
+    int64_t  sum   = 0;
 
     ltm_pwm_start();
 
-    for (n = 0; n < ZERO_SWEEP_POINTS; n++) {               /* 1) 正转两圈 */
+    for (uint16_t n = 0; n < ZERO_SWEEP_POINTS; n++) {     /* 1) 正转两圈 */
         lt_foc_update(ZERO_FIND_DUTY_Q15, 0, the, dutys);
         ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
         ltm_delay_ms(1);
         the += ZERO_SWEEP_THE_STEP;
     }
-    for (n = 0; n < ZERO_SWEEP_POINTS; n++) {               /* 2) 反转两圈，回到 0 */
+    for (uint16_t n = 0; n < ZERO_SWEEP_POINTS; n++) {     /* 2) 反转两圈，回到 0 */
         lt_foc_update(ZERO_FIND_DUTY_Q15, 0, the, dutys);
         ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
         ltm_delay_ms(1);
@@ -121,19 +123,17 @@ void control_tasks_zero_find(void)
     ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
     ltm_delay_ms(ZERO_SETTLE_MS);
 
-    for (i = 0; i < ZERO_AVG_N; i++) {                      /* 4) 读点：占空比保持住 */
-        int32_t d;
-
+    for (uint8_t i = 0; i < ZERO_AVG_N; i++) {              /* 4) 读点：占空比保持住 */
         ltm_delay_ms(1);
         ltm_enc_update();
         if (i == 0) c_ref = c_prev = (int32_t)ltm_enc_get_count();
 
-        d = (int32_t)ltm_enc_get_count() - c_prev;           /* 跨圈用增量累积 */
-        if (d >  (int32_t)(MOTOR_CPR / 2U)) d -= (int32_t)MOTOR_CPR;
+        int32_t d = (int32_t)ltm_enc_get_count() - c_prev;           /* 跨圈用增量累积 */
+        if (d >  (int32_t)(MOTOR_CPR / 2U))      d -= (int32_t)MOTOR_CPR;
         else if (d < -(int32_t)(MOTOR_CPR / 2U)) d += (int32_t)MOTOR_CPR;
-        disp += d;
+        disp   += d;
         c_prev += d;
-        sum  += disp;
+        sum    += disp;
         if (disp < d_min) d_min = disp;
         if (disp > d_max) d_max = disp;
     }
@@ -168,7 +168,7 @@ void control_tasks_init(void)
 #endif
 
     /* 四个环同构，照表一个循环初始化 */
-    for (unsigned i = 0; i < sizeof(pid_cfg) / sizeof(pid_cfg[0]); i++) {
+    for (uint8_t i = 0; i < sizeof(pid_cfg) / sizeof(pid_cfg[0]); i++) {
         const pid_cfg_t *cfg = &pid_cfg[i];
         lt_pid_init(cfg->idx, cfg->freq);
         lt_pid_set (cfg->idx, cfg->kp, cfg->ki, cfg->kd);
@@ -176,8 +176,9 @@ void control_tasks_init(void)
         lt_pid_set_target(cfg->idx, 0);
     }
 
-    lt_speed_init(MOTOR_CPR, CURRENT_LOOP_HZ / PLL_DIV);   /* PLL 更新率 = 电流环 / PLL_DIV */
-    lt_speed_set((uint32_t)PLL_KP, (uint32_t)PLL_KI);
+    lt_speed_init(SPD_IDX_PLL, LT_SPEED_TYPE_PLL, MOTOR_CPR, CURRENT_LOOP_HZ);  /* PLL 更新率 = 电流环 */
+    lt_speed_set (SPD_IDX_PLL, (uint32_t)PLL_KP, (uint32_t)PLL_KI);
+    lt_speed_init(SPD_IDX_T, LT_SPEED_TYPE_T, MOTOR_CPR, CURRENT_LOOP_HZ);      /* T 法：低速主用 */
 }
 
 void control_tasks_run(void)                /* 三环级联分频，无指令更新延迟 */
@@ -371,8 +372,9 @@ static void current_loop_task(void)                 /* 电流环任务 */
     int32_t  Ia, Ib, Ic;
     int32_t  vd, vq;
     int32_t  dutys[3] = { 0, 0, 0 };
-    lt_speed_update(pos_count);                     /* 单位 counts/s */
-    lt_speed_get(NULL, &speed_pll);
+    lt_speed_update(SPD_IDX_PLL, pos_count);        /* PLL：全速域，供角度前馈/解耦/过速 */
+    lt_speed_update(SPD_IDX_T,   pos_count);        /* T 法：低速反馈 */
+    speed_pll = lt_speed_get(SPD_IDX_PLL);
     /* PLL 打嗝防护：脏速度只影响上报，绝不许进 the/we 的补偿项 */
     speed_pll = lt_clamp_i32(speed_pll, SPEED_PLL_CPS_MAX, -SPEED_PLL_CPS_MAX);
 
@@ -455,17 +457,37 @@ static void current_loop_task(void)                 /* 电流环任务 */
 
 static void speed_loop_task(void)                   /* 速度环任务 */
 {
-    int32_t speed, speed_pll;
-    tasks_mode_t mode     = tasks->mode;
-    lt_speed_get(&speed, &speed_pll);               /* PLL测速已在电流环里更新，单位 count/s */
-    int32_t speed_q24     = CNT_TO_Q24(speed_pll);
+    int32_t speed_pll = lt_speed_get(SPD_IDX_PLL);  /* PLL：全速域有效，兼做切换判据与过速保护 */
+    int32_t speed_t   = lt_speed_get(SPD_IDX_T);    /* T 法：低速专用 */
+    tasks_mode_t mode = tasks->mode;
+
+    /* 低速切 T 法：40RPM 进、60RPM 出（滞环），判据固定用 PLL */
+    uint8_t use_t = tasks->spd_use_t;
+    if (use_t) {
+        if (speed_pll > SPD_T_OFF_CPS || speed_pll < -SPD_T_OFF_CPS)   use_t = 0;
+    } else {
+        if (speed_pll < SPD_T_ON_CPS  && speed_pll > -SPD_T_ON_CPS)    use_t = 1;
+    }
+    if (use_t && speed_t == 0 &&
+        (speed_pll > SPD_T_BLIND_CPS || speed_pll < -SPD_T_BLIND_CPS))
+        use_t = 0;                              /* T 法瞎了（窗口一直超时）：退回 PLL */
+    if (use_t != tasks->spd_use_t) {                /* 只在切换那一拍改增益 */
+        tasks->spd_use_t = use_t;
+        if (use_t) lt_pid_set(PID_SPEED, SPEED_KP_T_Q15, SPEED_KI_T_Q15, 0);
+        else       lt_pid_set(PID_SPEED, SPEED_KP_Q15,   SPEED_KI_Q15,   0);
+    }
+
+    int32_t speed_fb      = tasks->spd_use_t ? speed_t : speed_pll;
+    int32_t speed_q24     = CNT_TO_Q24(speed_fb);
+    int32_t speed_pll_q24 = CNT_TO_Q24(speed_pll);
     int32_t speed_ref_q24 = tasks->speed_ref_q24;   /* 参考速度给定 */
     /* 测速结果上报，并进行过速保护判断：±OVER_SPEED_Q24 */
-    tasks_info->speed     = speed;                  
-    /* 上报速度单独低通：只影响上报曲线，环路反馈仍用原始 PLL 值 */
-    int32_t sp_rep = speed_pll;
-    if (sp_rep < SPEED_REP_DEADBAND_CPS && sp_rep > -SPEED_REP_DEADBAND_CPS)
-        sp_rep = 0;                                     /* PLL 死区内没有有效读数 */
+    tasks_info->speed     = speed_t;                /* T 法原始值：上位机要对比时用它 */
+    /* 上报速度单独低通：只影响上报曲线，环路反馈仍用原始值 */
+    int32_t sp_rep = speed_fb;
+    if (!tasks->spd_use_t &&
+        sp_rep < SPEED_REP_DEADBAND_CPS && sp_rep > -SPEED_REP_DEADBAND_CPS)
+        sp_rep = 0;                                     /* PLL 死区内没有有效读数；T 法不设这个死区 */
     tasks->speed_rep_flt += (sp_rep - tasks->speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
     /* 移位 IIR 有粘滞：输入已为 0 时别让状态卡在 ±2^N 内回不到 0 */
     if (sp_rep == 0 &&
@@ -473,7 +495,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
         tasks->speed_rep_flt <  (1 << SPEED_REP_IIR_SHIFT))
         tasks->speed_rep_flt = 0;
     tasks_info->speed_pll = tasks->speed_rep_flt;
-    if (speed_q24 > OVER_SPEED_Q24 || speed_q24 < -OVER_SPEED_Q24) {
+    if (speed_pll_q24 > OVER_SPEED_Q24 || speed_pll_q24 < -OVER_SPEED_Q24) {
         _protect_trip(LT_ERR_OVER_SPEED);
     }
     if (lt_fsm_get() != State_Running)      return;

@@ -45,13 +45,18 @@
  * Kp = 4πζ·f_n、Ki = (2π·f_n)²/freq */
 #define PLL_KP                              2639
 #define PLL_KI                              ((uint32_t)(39.478f * 300.0f * 300.0f / CURRENT_LOOP_HZ + 0.5f))
+/* ============ 低速测速（T 法）============ */
+#define SPEED_T_LOOP_BW                     60.0f       /* T 法反馈时的速度环带宽（Hz）：T 窗口 1.5ms，延迟与 PLL 同量级，带宽不用压 */
+#define SPD_T_ON_RPM                        40.0f       /* 低于此转速用 T 法反馈 */
+#define SPD_T_OFF_RPM                       60.0f       /* 高于此转速切回 PLL（滞环）*/
+#define SPD_T_BLIND_RPM                     10.0f       /* T 法输出 0 但 PLL 超过此转速：判 T 法失效，退回 PLL */
 
 /* ============ 允许的 target 范围（应用单位）============ */
 #define TARGET_TORQUE_MAX_A                 2.0f            /* 转矩模式：±2.0A（峰值）*/
 #define TARGET_SPEED_MAX_RPM                3000.0f         /* 速度模式：±3000RPM */
 #define TARGET_POS_MAX_DEG                  (100 * 360.0f)  /* 位置模式：±100 圈（最大只允许±120圈）*/
 /* ============ 转子预定位参数 ============ */
-#define ZERO_FIND_DUTY                      0.05f       /* 预定位 D 轴强拖电压幅值（pu，1.0 = 母线/√3）*/
+#define ZERO_FIND_DUTY                     0.10f       /* 预定位 D 轴强拖幅值（pu）：1.0 = 母线/sqrt3。0.05 时命令电压 0.69V 与死区误差 0.48V 同量级，实际电流不定 -> 对齐点乱跑 */
 #define ZERO_SWEEP_TICKS_PER_ELEC           1000U       /* 每电周期扫多少步：1ms 一步 */
 #define ZERO_SWEEP_ELEC_TURNS               2U          /* 单方向扫过的电周期数（正反各扫一遍）*/
 #define ZERO_SETTLE_MS                      300         /* D 轴吸住的稳定时间（ms）：停稳后再取零点 */
@@ -60,7 +65,7 @@
 #define FRICTION_FF_ENABLE                  1           /* 速度环库仑摩擦前馈 */
 #define FRICTION_STATIC_CURR                0.18f       /* 静摩擦突破电流（A）*/
 #define FRICTION_VISCOUS                    0.00003f    /* 粘性摩擦系数（A/RPM）*/
-#define FRICTION_FF_DEADBAND                10.0f       /* 前馈死区（RPM）：低于此速不给前馈，防零速抖振 */
+#define FRICTION_FF_DEADBAND                1.0f       /* 前馈死区（RPM）：低于此速不给前馈，防零速抖振 */
 
 /* ============ 电机保护参数 ============ */
 #define OC_CURRENT                          11.0f       /* 过流保护触发：±11A */

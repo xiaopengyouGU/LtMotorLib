@@ -32,6 +32,10 @@
 #define     PLL_STOP_SHIFT                  3       /* 停机判定死区 = 最低速度 >> 3 = 1/8 RPM（由 pll_min_q16 移位得到，不占变量）*/
 #define     PLL_STOP_TIME_DEN               4       /* 停机判定时间 0.25 s = 1/4 s */
 #define     M_MIN_SPEED_RPM                 4       /* M 法可用下限（RPM）：各档按自己的窗口拍数折算成最少脉冲数 */
+#define     T_WIN_TICKS               30      /* T 法目标窗口（拍）= 1.5ms @20k：延迟压到 PLL 量级，环路带宽才守得住 */
+#define     T_N_MIN                   1       /* 窗口最少累计 count 数 */
+#define     T_N_MAX                   64      /* 窗口最多累计 count 数（防高速窗口过长）*/
+#define     T_IDLE_TICKS              4000    /* 无沿超时（0.2s @20k）= 判静止输出 0 */
 /* 位置估计的小数位上限（Q12）：init 按 reso 往下调，保证 reso<<pos_frac 不溢出 int32 */
 #define     POS_FRAC_MAX                    12
 
@@ -117,11 +121,22 @@ typedef struct{
     lt_speed_state_t state;             /* 自适应M法测速状态机 */
 }lt_speed_m_t;
 
+/* ---- T 法（周期法）状态 ---- */
+typedef struct{
+    int32_t  cnt_prev;                  /* 上一拍单圈 count */
+    int32_t  acc_cnt;                   /* 窗口内累计 count（有符号）*/
+    uint16_t acc_tick;                  /* 窗口内累计拍数 */
+    uint16_t n_tgt;                     /* 本窗口目标 count 数（按上一窗速度自适应）*/
+    int32_t  speed_q16;                 /* T 法输出（counts/tick，Q16）*/
+}lt_speed_t_t;
+
 /* ---- 汇总对象：常量 + 档位表 + PLL + M法 ---- */
 typedef struct{
+    uint8_t        type;                /* 本实例的测速方式 */
     lt_speed_cfg_t cfg;
     lt_speed_tab_t tab;
     lt_speed_pll_t pll;
+    lt_speed_t_t   t;
 #if LT_SPEED_USE_ADAP_M
     lt_speed_m_t   m;
 #endif
@@ -135,14 +150,16 @@ static const lt_speed_win_t win_config[Window_Count] = {
     { 999,  225, 2652,  1 }    /*  1 拍 =  0.5ms, 顶档（升档阈值不再使用）, 极点 = 2.65 f_n */
 };
 
-static lt_speed_obj speed_obj;  /* 唯一的测速对象 */
+/* ---- 实例池：无堆，idx 直接映射（和 lt_pid 一样）---- */
+static lt_speed_obj speed_pool[LT_SPEED_MAX_INSTANCES];
 
-static lt_speed_cfg_t *  cfg = &speed_obj.cfg;
-static lt_speed_tab_t *  tab = &speed_obj.tab;
-static lt_speed_pll_t *  pll = &speed_obj.pll;
-#if LT_SPEED_USE_ADAP_M
-static lt_speed_m_t   *  m   = &speed_obj.m;
-#endif
+static lt_speed_obj *_speed(uint8_t idx)
+{
+    if (idx < LT_SPEED_MAX_INSTANCES) {
+        return &speed_pool[idx];
+    }
+    return 0;
+}
 
 /**********************************************************************************************************/
 /*                                          静态小工具                                                    */
@@ -189,8 +206,10 @@ static inline int32_t _lpf_q16(int32_t x, int32_t y, uint8_t num, uint8_t shift)
 
 #if LT_SPEED_USE_ADAP_M
 /* M 法测速状态机：按 |speed| 在分档之间升/降 1 档（带滞环）*/
-static void _speed_update_state(void)
+static void _speed_update_state(lt_speed_obj *o)
 {
+    lt_speed_tab_t * tab = &o->tab;
+    lt_speed_m_t   * m   = &o->m;
     lt_speed_state_t curr_state = m->state;
     lt_speed_state_t new_state  = m->state;     /* 默认保持本档，别写成 Window_Cycle_16 */
     int32_t speed_abs           = ABS(m->speed);
@@ -211,8 +230,10 @@ static void _speed_update_state(void)
 
 /* 输出低通系数按带宽自适应：alpha = ratio·√(Ki/freq) = ratio·√g。只跟 g 有关、
  * 与 freq 无关，换调用频率时滤波器的墙钟时间常数自动不变。量化成 num/2^shift */
-static void _alpha_from_ki(uint32_t ki)
+static void _alpha_from_ki(lt_speed_obj *o, uint32_t ki)
 {
+    lt_speed_cfg_t * cfg = &o->cfg;
+    lt_speed_tab_t * tab = &o->tab;
     uint32_t g_q16, sq, b;
 
     if (!cfg->freq || !ki) return;
@@ -232,10 +253,10 @@ static void _alpha_from_ki(uint32_t ki)
             if (n > ALPHA_NUM_MAX) continue;
             uint32_t got = ((uint32_t)n << ALPHA_Q16_SHIFT) >> sh;
             uint32_t e = (got > want) ? (got - want) : (want - got);
-            if (e < best_e) { 
-                best_e = e; 
-                n_best = n; 
-                s_best = sh; 
+            if (e < best_e) {
+                best_e = e;
+                n_best = n;
+                s_best = sh;
             }
         }
         tab->alpha_num[b]   = (uint8_t)n_best;
@@ -243,13 +264,67 @@ static void _alpha_from_ki(uint32_t ki)
     }
 }
 
+/* T 法（周期法）：count 触发窗口，测窗口内 dcount/dticks。两端都落在沿上，
+ * dcount 是精确整数，只剩沿被 20kHz 采样量化的 +-1 拍 —— 相对误差 1sigma = 0.58/dticks，
+ * 只跟窗口拍数有关，所以低速下比 PLL 的微分量化好几个数量级。
+ * 窗口目标 n 按上一窗速度自适应，把窗口时长稳在 T_WIN_TICKS 附近。 */
+static void _t_update(lt_speed_obj *o, uint32_t pos_count)
+{
+    lt_speed_cfg_t * cfg = &o->cfg;
+    lt_speed_t_t   * t   = &o->t;
+
+    int32_t d = (int32_t)pos_count - t->cnt_prev;
+    if (d > cfg->half_reso)         d -= cfg->reso;
+    else if (d < -cfg->half_reso)   d += cfg->reso;
+    t->cnt_prev = (int32_t)pos_count;
+
+    int32_t prev = t->acc_cnt;
+    t->acc_cnt  += d;
+    t->acc_tick++;
+
+    /* 只有窗口内累计值真的穿越零点才算换向；单个 +-1 计数毛刺不触发 ——
+     * 否则低速下毛刺会反复清窗，窗口永远到不了 n，一路超时输出 0，环路失控 */
+    if (prev != 0 && t->acc_cnt != 0 && ((prev > 0) != (t->acc_cnt > 0))) {
+        t->acc_cnt  = d;
+        t->acc_tick = 1;
+    }
+
+    int32_t n = (int32_t)t->n_tgt;
+    if (n < T_N_MIN) n = T_N_MIN;
+
+    if (t->acc_cnt >= n || t->acc_cnt <= -n) {
+        t->speed_q16 = (int32_t)(((int64_t)t->acc_cnt << SPEED_FRAC) / (int32_t)t->acc_tick);
+
+        int32_t w = (int32_t)(((int64_t)ABS(t->speed_q16) * T_WIN_TICKS) >> SPEED_FRAC);
+        if (w < T_N_MIN) w = T_N_MIN;
+        if (w > T_N_MAX) w = T_N_MAX;
+        t->n_tgt    = (uint16_t)w;
+        t->acc_cnt  = 0;
+        t->acc_tick = 0;
+    } else if (t->acc_tick >= T_IDLE_TICKS) {
+        t->speed_q16 = 0;                               /* 长时间没有沿：静止 */
+        t->n_tgt     = T_N_MIN;
+        t->acc_cnt   = 0;
+        t->acc_tick  = 0;
+    }
+}
+
 /**********************************************************************************************************/
 /*                                          对外接口                                                      */
 /**********************************************************************************************************/
-void lt_speed_init(uint32_t reso, uint32_t freq)
+uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq)
 {
-    memset(&speed_obj, 0, sizeof(speed_obj));
-    if (!reso || !freq)     return;
+    lt_speed_obj *o = _speed(idx);
+    if (!o)                     return 0;               /* 索引越界 */
+    memset(o, 0, sizeof(lt_speed_obj));
+    if (!reso || !freq)         return 0;
+
+    o->type = type;
+    lt_speed_cfg_t * cfg = &o->cfg;
+    lt_speed_tab_t * tab = &o->tab;
+#if LT_SPEED_USE_ADAP_M
+    lt_speed_m_t   * m   = &o->m;
+#endif
 
     cfg->reso       = (int32_t)reso;
     cfg->half_reso  = (int32_t)(reso >> 1);
@@ -289,28 +364,66 @@ void lt_speed_init(uint32_t reso, uint32_t freq)
         tab->alpha_num[b]   = 1;
         tab->alpha_shift[b] = 4;
     }
+    o->t.n_tgt = T_N_MIN;
     cfg->state = LT_SPEED_ST_WAIT_SYNC;
+    return 1;
 }
 
-void lt_speed_set(uint32_t pll_kp, uint32_t pll_ki)
+void lt_speed_reset(uint8_t idx)
 {
-    if (!cfg->state)     return;
+    lt_speed_obj *o = _speed(idx);
+    if (!o || !o->cfg.freq)     return;
+
+    o->pll.pos_est   = 0;
+    o->pll.speed_est = 0;
+    o->pll.speed_pll = 0;
+    o->pll.stop_cnt  = 0;
+    o->t.cnt_prev    = 0;
+    o->t.acc_cnt     = 0;
+    o->t.acc_tick    = 0;
+    o->t.n_tgt       = T_N_MIN;
+    o->t.speed_q16   = 0;
+    o->cfg.state     = LT_SPEED_ST_WAIT_SYNC;
+}
+
+void lt_speed_set(uint8_t idx, uint32_t pll_kp, uint32_t pll_ki)
+{
+    lt_speed_obj *o = _speed(idx);
+    if (!o || !o->cfg.state)                return;
+    if (o->type != LT_SPEED_TYPE_PLL)       return;     /* 只有 PLL 有可整定增益 */
+
     /* Kp_dt = Kp/freq（Q16）；Ki_dt = Ki/freq（Q16）—— 与浮点版 pll_kp*dt、pll_ki*dt*dt 等价 */
-    pll->kp_dt_q16 = (int32_t)(((int64_t)pll_kp << SPEED_FRAC) / cfg->freq);
-    pll->ki_dt_q16 = (int32_t)(((int64_t)pll_ki << SPEED_FRAC) / cfg->freq);
-    _alpha_from_ki(pll_ki);                             /* 输出低通随带宽走 */
+    o->pll.kp_dt_q16 = (int32_t)(((int64_t)pll_kp << SPEED_FRAC) / o->cfg.freq);
+    o->pll.ki_dt_q16 = (int32_t)(((int64_t)pll_ki << SPEED_FRAC) / o->cfg.freq);
+    _alpha_from_ki(o, pll_ki);                          /* 输出低通随带宽走 */
 }
 
-void lt_speed_update(uint32_t pos_count)
+void lt_speed_update(uint8_t idx, uint32_t pos_count)
 {
-    if (!cfg->state)    return;
+    lt_speed_obj *o = _speed(idx);
+    if (!o || !o->cfg.state)    return;
+
+    lt_speed_cfg_t * cfg = &o->cfg;
+    lt_speed_tab_t * tab = &o->tab;
+    lt_speed_pll_t * pll = &o->pll;
+#if LT_SPEED_USE_ADAP_M
+    lt_speed_m_t   * m   = &o->m;
+#endif
+
     if (cfg->state == LT_SPEED_ST_WAIT_SYNC) {
 #if LT_SPEED_USE_ADAP_M
-        m->pos_last  = pos_count;
+        m->pos_last   = pos_count;
 #endif
-        pll->pos_est = (int32_t)pos_count << cfg->pos_frac;
-        cfg->state   = LT_SPEED_ST_RUN;
+        pll->pos_est  = (int32_t)pos_count << cfg->pos_frac;
+        o->t.cnt_prev = (int32_t)pos_count;
+        o->t.n_tgt    = T_N_MIN;
+        cfg->state    = LT_SPEED_ST_RUN;
         return;                                         /* 首拍只同步，不参与测速 */
+    }
+
+    if (o->type == LT_SPEED_TYPE_T) {
+        _t_update(o, pos_count);
+        return;                                         /* T 法实例不跑 PLL/M 法 */
     }
 
     int32_t reso       = cfg->reso;
@@ -351,7 +464,7 @@ void lt_speed_update(uint32_t pos_count)
         m->speed_last = speed;
         m->pos_last   = pos_count;
         m->speed      = speed;
-        _speed_update_state();
+        _speed_update_state(o);
     }
 #endif
 
@@ -400,18 +513,19 @@ void lt_speed_update(uint32_t pos_count)
 }
 
 /* 输出：count/s（int32），应用层需要 RPM 时自己按 60/reso 折算 */
-void lt_speed_get(int32_t *adap_speed, int32_t *pll_speed)
+int32_t lt_speed_get(uint8_t idx)
 {
-    if (cfg->state != LT_SPEED_ST_RUN) {
-        if (adap_speed)     *adap_speed = 0;
-        if (pll_speed)      *pll_speed  = 0;
-        return;
+    lt_speed_obj *o = _speed(idx);
+    if (!o || o->cfg.state != LT_SPEED_ST_RUN)      return 0;
+
+    if (o->type == LT_SPEED_TYPE_T) {
+        return (int32_t)(((int64_t)o->t.speed_q16 * o->cfg.freq) >> SPEED_FRAC);
     }
-    /* counts/tick(Q16) → count/s：×freq >> 16 */
 #if LT_SPEED_USE_ADAP_M
-    if (adap_speed)     *adap_speed = (int32_t)(((int64_t)m->speed       * cfg->freq) >> SPEED_FRAC);
-#else
-    if (adap_speed)     *adap_speed = 0;                /* M 法已裁剪，只输出 PLL */
+    if (o->type == LT_SPEED_TYPE_ADAP_M) {
+        return (int32_t)(((int64_t)o->m.speed * o->cfg.freq) >> SPEED_FRAC);
+    }
 #endif
-    if (pll_speed)      *pll_speed  = (int32_t)(((int64_t)pll->speed_pll * cfg->freq) >> SPEED_FRAC);
+    /* counts/tick(Q16) -> count/s：xfreq >> 16 */
+    return (int32_t)(((int64_t)o->pll.speed_pll * o->cfg.freq) >> SPEED_FRAC);
 }

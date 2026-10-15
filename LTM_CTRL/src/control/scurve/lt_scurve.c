@@ -147,7 +147,7 @@ int32_t lt_scurve_update(uint8_t idx)
     int32_t v  = s->vel;
     int64_t d  = (int64_t)s->target - s->pos;       /* 剩余距离（带符号）*/
 
-    /* 1) 要不要刹：目标在背后、或剩余距离已经不够停 */
+    /* 1) 刹车判断：目标在背后、或剩余距离已经不够停 */
     uint8_t brake;
     if (v == 0) {
         brake = 0;
