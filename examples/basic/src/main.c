@@ -221,11 +221,18 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
         }
 
         case Data_CMD_Start:
+        {
+            lt_err_t err;
             lt_motor_enable();                              /* 使能：PWM 上电，进入 Enable */
-            lt_motor_run();                                 /* 运行：进入 Running，电流环输出 */
-            ltm_commut_send(Data_CMD_Start, (uint8_t[]){0}, 1);
-            ltm_commut_printf("Start\n");
+            err = lt_motor_run();                           /* 运行：进入 Running，电流环输出 */
+            if (err != LT_OK) {                             /* 停机态速度没落进窗口就会拒，必须回显原因 */
+                ltm_commut_printf("Start rejected: %s\r\n", err_name((int)err));
+            } else {
+                ltm_commut_send(Data_CMD_Start, (uint8_t[]){0}, 1);
+                ltm_commut_printf("Start\n");
+            }
             break;
+        }
 
         case Data_CMD_Stop:
             lt_motor_stop(0);                               /* 停机：0 占空比 */
