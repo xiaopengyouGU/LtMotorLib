@@ -511,10 +511,8 @@ static void speed_loop_task(void)                   /* 速度环任务 */
     }
 
     /* 位置保持态 pos_hold：到位 + 速度已停 + 规划器确实不动（最后一条防把慢速爬行误判成保持）。
-     * 保持段只做一件事：不给摩擦前馈。保持时速度给定只是位置环 PD 的输出，PD 的 D 项吃编码器
-     * 1 count 量化（1kHz 下折合几 RPM 毛刺），来回穿过前馈死区，前馈就在 ±0.18A 之间翻、
-     * 顶破静摩擦微滑 1 count（data_7：位置 ±1count、iq 到 ±0.18A）。
-     * 位置环 / 速度环照常闭环、积分不动：受外力时靠闭环顶住，Ki 就是保持力矩的来源 */
+     * 保持段关闭摩擦前馈。
+     * 位置环 / 速度环照常闭环、积分不动：受外力时靠闭环顶住 */
     tasks->pos_hold = (mode == Mode_Position) && tasks->in_pos &&
                       !LT_OVER_RANGE(speed_q24, STOP_DONE_Q24) &&
                       (!tasks->scurve_ready || lt_scurve_is_done(SCURVE_IDX));
