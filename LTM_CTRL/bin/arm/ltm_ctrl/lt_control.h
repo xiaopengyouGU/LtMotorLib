@@ -155,6 +155,7 @@ typedef struct {
     uint16_t acct_ms;           /* 加速时间（ms），最小 20ms：a_acc = v_max/acct_ms */
     uint16_t dect_ms;           /* 减速时间 (ms)，最小 20ms：a_dec = v_max/dect_ms */
     uint16_t period_ms;         /* 规划更新周期（ms）*/
+    uint16_t jerk_ms;           /* S 形 jerk 段时长（ms）：加速度 0→满 花多少时间；0 = 退回 acct_ms/2 */
     uint8_t  type;              /* 0:T形加减速，1：S形加减速（加速度按 jerk 渐变）*/
 } lt_scurve_config_t;
 

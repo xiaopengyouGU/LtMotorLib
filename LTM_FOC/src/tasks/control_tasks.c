@@ -294,7 +294,8 @@ void control_tasks_plan_start(void)
     cfg.acct_ms    = POS_ACC_MS;
     cfg.dect_ms    = POS_ACC_MS;
     cfg.period_ms  = 1;                             /* 位置环 1kHz */
-    cfg.type       = 0;                             /* T 形加减速 */
+    cfg.jerk_ms    = POS_JERK_MS;                   /* S 形 jerk 段时长（机型参数）*/
+    cfg.type       = POS_SCURVE_TYPE;               /* 加减速类型：0 = T 形，1 = S 形（机型参数）*/
     lt_scurve_start(SCURVE_IDX, &cfg);
 
     tasks->scurve_ready = 1;                

@@ -79,6 +79,8 @@
 #define POSITION_ACCEL_RATE                 600.0f      /* 梯形加减速斜率（RPM/s）*/
 #define POSITION_MAX_SPEED                  1200.0f     /* 位置模式速度上限（RPM）*/
 #define POS_WIN_CNT                         15          /* 位置模式到位窗口：15 count */
+#define POS_SCURVE_TYPE                     1           /* 位置规划器加减速：0 = T 形，1 = S 形（加速度按 jerk 渐变）*/
+#define POS_JERK_MS                         300         /* S 形 jerk 段时长（ms）：加速度 0→满 用多久；相对 2000ms 斜坡取 10~25% 才看得出 S */
 #define SPEED_RAMP_RATE                     900.0f      /* 斜坡速度：目标按此斜率逼近（RPM/s）*/
 #define TORQUE_RAMP_RATE                    1.0f       /* 斜坡转矩：目标按此斜率逼近（A/s）*/
 /* 可控停机：速度给定按此斜率降到 0，实测速度进窗口后才清占空比。*/
