@@ -3,7 +3,7 @@
 
 #include "hal_data.h"
 
-//#define TEST_LOOP_TIME          1       /* 启动电流环执行时间测量：翻转GPIO */
+//#define TEST_LOOP_TIME          1       /* 启动电流环执行时间测量：ADC 中断进出翻转 P306 */
 #define TEST_GPIO_PORT_PIN      BSP_IO_PORT_03_PIN_06     
 
 /*---------------------- ADC 配置宏 ----------------------*/
