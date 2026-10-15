@@ -1,3 +1,18 @@
 {
-    "cmake.sourceDirectory": "D:/Develop/LtMotorLib/LtMotorLib_Main/LTM_CTRL"
+    "cmake.sourceDirectory": "D:/Develop/LtMotorLib/LtMotorLib_Main/LTM_CTRL",
+    "C_Cpp.default.intelliSenseMode": "windows-gcc-arm",
+    "files.encoding": "utf8",
+    "search.exclude": {
+        "**/build": true,
+        "**/bin/*.a": true,
+        "**/.git": true,
+        "**/__pycache__": true
+    },
+    "files.exclude": {
+        "**/build/CMakeFiles": true,
+        "**/__pycache__": true,
+        "**/*.o": true,
+        "**/*.elf": true,
+        "**/*.map": true
+    }
 }
