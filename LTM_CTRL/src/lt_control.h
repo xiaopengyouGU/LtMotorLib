@@ -71,7 +71,7 @@ uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq);	
 void    lt_speed_reset(uint8_t idx);
 void    lt_speed_set(uint8_t idx, uint32_t pll_kp, uint32_t pll_ki);/* pll_kp : 比例增益（1/s），pll_ki : 积分增益（1/s^2），内部已乘调用周期 dt */
 void    lt_speed_update(uint8_t idx, uint32_t pos_count);		    /* 测速更新，输入编码器原始值：count（单圈计数 0~reso-1）*/
-int32_t lt_speed_get(uint8_t idx); /* 返回锁相环测速结果（count/s）；adap_speed 仅在开关打开时有效，否则恒为 0 */
+int32_t lt_speed_get(uint8_t idx);        /* 返回测速结果（count/s）：PLL 或 T 法，看实例类型 */
 
 /*------------------------- 测速接口 （count/s，高频调用） ---------------------------------*/
 

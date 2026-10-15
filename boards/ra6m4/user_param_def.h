@@ -46,10 +46,9 @@
 #define PLL_KP                              2639
 #define PLL_KI                              ((uint32_t)(39.478f * 300.0f * 300.0f / CURRENT_LOOP_HZ + 0.5f))
 /* ============ 低速测速（T 法）============ */
-#define SPEED_T_LOOP_BW                     60.0f       /* T 法反馈时的速度环带宽（Hz）：T 窗口 1.5ms，延迟与 PLL 同量级，带宽不用压 */
-#define SPD_T_ON_RPM                        40.0f       /* 低于此转速用 T 法反馈 */
-#define SPD_T_OFF_RPM                       60.0f       /* 高于此转速切回 PLL（滞环）*/
-#define SPD_T_BLIND_RPM                     10.0f       /* T 法输出 0 但 PLL 超过此转速：判 T 法失效，退回 PLL */
+#define SPEED_T_ON_RPM                      40.0f       /* 低于此转速用 T 法反馈 */
+#define SPEED_T_OFF_RPM                     60.0f       /* 高于此转速切回 PLL（滞环）*/
+#define SPEED_T_BLIND_RPM                   10.0f       /* T 法输出 0 但 PLL 超过此转速：判 T 法失效，退回 PLL */
 
 /* ============ 允许的 target 范围（应用单位）============ */
 #define TARGET_TORQUE_MAX_A                 2.0f            /* 转矩模式：±2.0A（峰值）*/

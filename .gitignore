@@ -19,3 +19,6 @@ LTM_HAL/**/lib/*.a
 # editor temp files
 *.swp
 *.bak
+*.bak*
+*.orig
+*.rej

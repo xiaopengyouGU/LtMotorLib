@@ -18,6 +18,8 @@ float lt_normalize_quick(float value, float range);     /* 快速归一化，[0,
 #define LOW_PASS_FILTER(X_k,Y_k_1,a) 	((a)*(X_k) + (1.0f - (a))*(Y_k_1))
 #define HIGH_PASS_FILTER(X_k,Y_k_1,a)	((1.0f - (a))*(X_k) + (a)*(Y_k_1))
 #define CONSTRAINS(x,up,down)			((x) < (down) ? (down) : ((x) > (up) ? (up) : (x)))
+/* 对称范围判断：超出 ±max 为真 */
+#define LT_OVER_RANGE(x,max)			((x) > (max) || (x) < -(max))
 
 
 /* macro values */

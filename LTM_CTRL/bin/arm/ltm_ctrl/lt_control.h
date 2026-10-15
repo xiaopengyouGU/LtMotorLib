@@ -45,7 +45,7 @@ int32_t lt_pid_update(uint8_t idx, int32_t curr_val);   /* 增量式 PID */
  */
 void lt_foc_init(void);                                     /* 必须先初始化 */
 void lt_foc_set(uint32_t reso);                             /* 初始化后设置分辨率 */
-void lt_foc_update(int16_t Vd, int16_t Vq, uint32_t the, int32_t dutys[3]);/* Q15 定点 FOC，输出三相占空比（Q15）*/
+void lt_foc_update(int32_t Vd, int32_t Vq, uint32_t the, int32_t dutys[3]);/* Q15 定点 FOC，输出三相占空比（Q15）*/
 void lt_foc_clark_park(int32_t fnum[3], uint32_t the, int32_t *fd, int32_t *fq);
 
 /*------------------------- FOC 算法 ---------------------------------*/
@@ -53,17 +53,25 @@ void lt_foc_clark_park(int32_t fnum[3], uint32_t the, int32_t *fd, int32_t *fq);
 /*自适应 M 法开关：
  *   1 = 启用：M 法测得准，主要用于评估/对比 PLL 参数设计的效果
  *   0 = 关闭（默认）：只跑锁相环，热路径更短
- * 关闭时 lt_speed_get() 的 adap_speed 恒为 0 */
+ * /* 测速方式见 control/speed/lt_speed.h 的 lt_speed_type_t */
 #ifndef LT_SPEED_USE_ADAP_M
 #define LT_SPEED_USE_ADAP_M             0
 #endif
 
 /*------------------------- 测速接口 （count/s，高频调用）---------------------------------*/
 
-void lt_speed_init(uint32_t reso, uint32_t freq);	/* reso : 编码器分辨率， freq : 调用频率（Hz） */
-void lt_speed_set(uint32_t pll_kp, uint32_t pll_ki);/* pll_kp : 比例增益（1/s），pll_ki : 积分增益（1/s^2），内部已乘调用周期 dt */
-void lt_speed_update(uint32_t pos_count);		    /* 测速更新，输入编码器原始值：count（单圈计数 0~reso-1）*/
-void lt_speed_get(int32_t *adap_speed, int32_t *pll_speed); /* 返回锁相环测速结果（count/s）；adap_speed 仅在开关打开时有效，否则恒为 0 */
+/* 测速方式（与 control/speed/lt_speed.h 一致）*/
+typedef enum {
+    LT_SPEED_TYPE_PLL      = 0,
+    LT_SPEED_TYPE_T        = 1,
+    LT_SPEED_TYPE_ADAP_M   = 2
+} lt_speed_type_t;
+
+uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq);	/* reso : 编码器分辨率， freq : 调用频率（Hz） */
+void    lt_speed_reset(uint8_t idx);
+void    lt_speed_set(uint8_t idx, uint32_t pll_kp, uint32_t pll_ki);/* pll_kp : 比例增益（1/s），pll_ki : 积分增益（1/s^2），内部已乘调用周期 dt */
+void    lt_speed_update(uint8_t idx, uint32_t pos_count);		    /* 测速更新，输入编码器原始值：count（单圈计数 0~reso-1）*/
+int32_t lt_speed_get(uint8_t idx);        /* 返回测速结果（count/s）：PLL 或 T 法，看实例类型 */
 
 /*------------------------- 测速接口 （count/s，高频调用） ---------------------------------*/
 

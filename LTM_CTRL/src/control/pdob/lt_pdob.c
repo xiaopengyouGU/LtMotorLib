@@ -22,8 +22,8 @@
 #define Q_WEK    16                 /* we_k 的 Q 格式：we_pu = speed·we_k >> Q_WEK */
 #define SH_ST    (Q_ST - Q_SIG)     /* Q24 状态 ↔ Q15 信号（9）*/
 #define SH_MUL   (2 * Q_SIG - Q_ST) /* Q15×Q15 → Q24 的右移（6），状态增量用 */
-#define Q_SPD    24                 /* 速度环内部：速度与增益一律 pu Q24 */
-#define SH_SPD   (Q_SPD - Q_SIG)    /* pu Q24 ↔ 对外 Q15 iq（9）*/
+#define Q_SPEED  24                 /* 速度环内部：速度与增益一律 pu Q24 */
+#define SH_SPEED (Q_SPEED - Q_SIG)  /* pu Q24 ↔ 对外 Q15 iq（9）*/
 
 /* 状态（Q24）↔ 信号（Q15）*/
 static inline int32_t st2sig(int32_t x) { return x >> SH_ST; }
@@ -152,19 +152,19 @@ static void speed_init(int32_t acc_per_iq, uint32_t freq, int32_t speed_max, int
     dob->base = base;
 
     /* 输出 / 扰动限幅：对外 Q15 iq → 内部 Q24 iq */
-    dob->out_lim_q24 = (int32_t)prm->i_max << SH_SPD;
-    dob->d_max_q24   = (int32_t)(d_limit_iq > DOB_D_MAX ? DOB_D_MAX : d_limit_iq) << SH_SPD;
+    dob->out_lim_q24 = (int32_t)prm->i_max << SH_SPEED;
+    dob->d_max_q24   = (int32_t)(d_limit_iq > DOB_D_MAX ? DOB_D_MAX : d_limit_iq) << SH_SPEED;
 
-    /* count/s → pu Q24：k_q = 2^(Q_SPD+s)/base，s 取到 k_q 不顶 int32 */
+    /* count/s → pu Q24：k_q = 2^(Q_SPEED+s)/base，s 取到 k_q 不顶 int32 */
     s = 30;
-    while (s > 0 && ((int64_t)1 << (Q_SPD + s)) / base >= INT32_MAX) s--;
-    dob->k_q  = (int32_t)(((((int64_t)1 << (Q_SPD + s))) + (base >> 1)) / base);
+    while (s > 0 && ((int64_t)1 << (Q_SPEED + s)) / base >= INT32_MAX) s--;
+    dob->k_q  = (int32_t)(((((int64_t)1 << (Q_SPEED + s))) + (base >> 1)) / base);
     dob->k_sh = (uint8_t)s;
 
     /* C = 每拍、每 pu iq 产生的 pu 加速度（Q24）：
      *   1 pu iq = 32767 LSB，1 pu 速度 = base count/s ⇒ C = acc·32767/(freq·base)
      * 分两步算，避免 acc 直接左移 39 位把 int64 顶掉。*/
-    dob->c_q24 = (int32_t)(((((int64_t)acc << Q_SIG) / dob->freq) << Q_SPD) / base);
+    dob->c_q24 = (int32_t)(((((int64_t)acc << Q_SIG) / dob->freq) << Q_SPEED) / base);
     if (dob->c_q24 < 1) dob->c_q24 = 1;
 }
 
@@ -180,7 +180,7 @@ static void speed_set(int32_t kp, int32_t wb, int32_t out_limit)
     dob->kp_q24 = (int32_t)kpd;
 
     /* 输出限幅：iq 是 1.0 pu 信号，上界就是满量程 */
-    if (out_limit > 0) dob->out_lim_q24 = lt_clamp_i32(out_limit,  Q15_ONE, -Q15_ONE) << SH_SPD;
+    if (out_limit > 0) dob->out_lim_q24 = lt_clamp_i32(out_limit,  Q15_ONE, -Q15_ONE) << SH_SPEED;
 
     if (wb <= 0) {                          /* 关闭扰动补偿：只剩纯 P 环 */
         dob->en         = 0;
@@ -192,7 +192,7 @@ static void speed_set(int32_t kp, int32_t wb, int32_t out_limit)
     if (wb > (int32_t)dob->freq) wb = (int32_t)dob->freq;   /* K = wb·dt ≤ 1 */
 
     /* kd = K/C（Q24）：C 很小时封顶，热路径乘积仍在 64 位内 */
-    kd = ((int64_t)wb << Q_SPD) / dob->freq * ((int64_t)1 << Q_SPD) / dob->c_q24;
+    kd = ((int64_t)wb << Q_SPEED) / dob->freq * ((int64_t)1 << Q_SPEED) / dob->c_q24;
     dob->kd_q24 = (kd > INT32_MAX) ? INT32_MAX : (int32_t)kd;
     dob->en = 1;
 }
@@ -209,27 +209,27 @@ static int32_t speed_update(int32_t speed, int32_t iq)
 
     if (dob->en) {
         int32_t dw    = w_q24 - dob->w_prev_q24;                  /* 实测加速度 */
-        int32_t acc   = (iq << SH_SPD) + dob->d_q24;              /* 控制 + 扰动 */
-        int32_t model = (int32_t)(((int64_t)dob->c_q24 * acc) >> Q_SPD);
+        int32_t acc   = (iq << SH_SPEED) + dob->d_q24;              /* 控制 + 扰动 */
+        int32_t model = (int32_t)(((int64_t)dob->c_q24 * acc) >> Q_SPEED);
         int32_t err   = dw - model;
 
-        t = (int64_t)dob->d_q24 + (((int64_t)dob->kd_q24 * err) >> Q_SPD);
+        t = (int64_t)dob->d_q24 + (((int64_t)dob->kd_q24 * err) >> Q_SPEED);
         t = lt_clamp_i64(t, dob->d_max_q24, -dob->d_max_q24);        /* 64 位域夹限 */
         dob->d_q24 = (int32_t)t;
     }
     dob->w_prev_q24 = w_q24;
 
     /* 控制律：iq_ref = kp·(ref − w) − d */
-    t = (((int64_t)dob->kp_q24 * (dob->ref_q24 - w_q24)) >> Q_SPD) - dob->d_q24;
+    t = (((int64_t)dob->kp_q24 * (dob->ref_q24 - w_q24)) >> Q_SPEED) - dob->d_q24;
     int32_t lim = dob->out_lim_q24;
     if (dob->fw_ki) {   /* 弱磁占用的电流从 iq 预算里扣掉 */
         lim -= (int32_t)((dob->id_fw_q15 < 0 ? -(int32_t)dob->id_fw_q15
-                                                : dob->id_fw_q15) << SH_SPD);
+                                                : dob->id_fw_q15) << SH_SPEED);
         if (lim < 0) lim = 0;
     }
     t = lt_clamp_i64(t, lim, -lim);
     
-    return (int32_t)(t >> SH_SPD);
+    return (int32_t)(t >> SH_SPEED);
 }
 
 /* t(r) = 0.995/√(1+r²)，r = k/64，Q15：圆形限幅的修正系数。

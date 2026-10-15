@@ -23,16 +23,11 @@
 #define PID_IQ          1U
 #define PID_SPEED       2U
 #define PID_POS         3U
-#define SPD_IDX_PLL     0U      /* 测速池：PLL */
-#define SPD_IDX_T       1U      /* 测速池：T 法 */
+#define SPEED_IDX_PLL   0U      /* 测速池：PLL */
+#define SPEED_IDX_T     1U      /* 测速池：T 法 */
 #define SCURVE_IDX      0U
 #define RAMP_SPEED_IDX  0U
 #define RAMP_TORQUE_IDX 1U
-
-/* PLL 速度上限（count/s）：单拍脏值不许进角度延迟补偿和解耦前馈，
- * 否则 the 被打飞、转矩方向翻转——就是"莫名反向"的来源 */
-
-#define SPEED_PLL_CPS_MAX   ((int32_t)((int64_t)OVER_SPEED * MOTOR_CPR / 60))
 
 /* 上报死区：PLL 的死区是 1 RPM（PLL_MIN_SPEED_RPM），它以下没有有效读数，
  * 直接归零——否则两级整数低通的粘滞会把 0 显示成 ±0.4 RPM */
@@ -46,7 +41,7 @@ typedef struct {
     int32_t      speed_ref_q24;             /* 速度给定（Q24 圈/s）*/
     uint8_t      scurve_ready;              /* 位置规划器已启动 */
     uint8_t      in_pos;                    /* 位置到位指示 */
-    uint8_t      spd_use_t;              /* 速度反馈源：1 = T 法，0 = PLL */
+    uint8_t      speed_use_t;               /* 速度反馈源：1 = T 法，0 = PLL */
     int32_t      ph_i_q15[3];               /* 本拍三相电流，死区补偿用 */
     int32_t      id_flt, iq_flt;            /* 电流反馈滤波状态（Q15），只给 PI/前馈 */
     int32_t      speed_rep_flt;             /* 上报速度低通状态（count/s）*/
@@ -176,9 +171,9 @@ void control_tasks_init(void)
         lt_pid_set_target(cfg->idx, 0);
     }
 
-    lt_speed_init(SPD_IDX_PLL, LT_SPEED_TYPE_PLL, MOTOR_CPR, CURRENT_LOOP_HZ);  /* PLL 更新率 = 电流环 */
-    lt_speed_set (SPD_IDX_PLL, (uint32_t)PLL_KP, (uint32_t)PLL_KI);
-    lt_speed_init(SPD_IDX_T, LT_SPEED_TYPE_T, MOTOR_CPR, CURRENT_LOOP_HZ);      /* T 法：低速主用 */
+    lt_speed_init(SPEED_IDX_PLL, LT_SPEED_TYPE_PLL, MOTOR_CPR, CURRENT_LOOP_HZ);  /* PLL 更新率 = 电流环 */
+    lt_speed_set (SPEED_IDX_PLL, (uint32_t)PLL_KP, (uint32_t)PLL_KI);
+    lt_speed_init(SPEED_IDX_T, LT_SPEED_TYPE_T, MOTOR_CPR, CURRENT_LOOP_HZ);      /* T 法：低速主用 */
 }
 
 void control_tasks_run(void)                /* 三环级联分频，无指令更新延迟 */
@@ -371,11 +366,9 @@ static void current_loop_task(void)                 /* 电流环任务 */
     int32_t  Ia, Ib, Ic;
     int32_t  vd, vq;
     int32_t  dutys[3] = { 0, 0, 0 };
-    lt_speed_update(SPD_IDX_PLL, pos_count);        /* PLL：全速域，供角度前馈/解耦/过速 */
-    lt_speed_update(SPD_IDX_T,   pos_count);        /* T 法：低速反馈 */
-    speed_pll = lt_speed_get(SPD_IDX_PLL);
-    /* PLL 打嗝防护：脏速度只影响上报，绝不许进 the/we 的补偿项 */
-    speed_pll = lt_clamp_i32(speed_pll, SPEED_PLL_CPS_MAX, -SPEED_PLL_CPS_MAX);
+    lt_speed_update(SPEED_IDX_PLL, pos_count);       /* PLL：全速域，供角度前馈/解耦/过速 */
+    lt_speed_update(SPEED_IDX_T,   pos_count);       /* T 法：低速反馈 */
+    speed_pll = lt_speed_get(SPEED_IDX_PLL);
 
     /* 电角度 =（单圈计数 − 零点偏置）× 极对数 */
     uint32_t the  = COUNT_TO_THE(pos_count, tasks->zero_offset);
@@ -389,9 +382,9 @@ static void current_loop_task(void)                 /* 电流环任务 */
     uint32_t the_mod = the_park + (uint32_t)((adv1 * 3) >> 1); /* 1.5 拍延迟补偿 */
 
     ltm_adc_get_current(&Ia, &Ib, &Ic);               /* HAL 已归一化成 Q15 标幺 */
-    if (Ia >= OC_CURRENT_Q15 || Ia <= -OC_CURRENT_Q15 ||
-        Ib >= OC_CURRENT_Q15 || Ib <= -OC_CURRENT_Q15 ||
-        Ic >= OC_CURRENT_Q15 || Ic <= -OC_CURRENT_Q15) {
+    if (LT_OVER_RANGE(Ia, OC_CURRENT_Q15) ||
+        LT_OVER_RANGE(Ib, OC_CURRENT_Q15) ||
+        LT_OVER_RANGE(Ic, OC_CURRENT_Q15)) {
         _protect_trip(LT_ERR_OVER_CURRENT);                     /* 触发过流保护 */
     }
 
@@ -400,7 +393,7 @@ static void current_loop_task(void)                 /* 电流环任务 */
     tasks->ph_i_q15[1] = Ib;
     tasks->ph_i_q15[2] = Ic;
 
-    /* 幅值不变 Clarke+Park：与 lt_foc_update 共用同一张表和 step，严格互逆 */
+    /* 等幅值 Clarke+Park  */
     lt_foc_clark_park(f3, the_park, &Id, &Iq);
     /* 电流反馈轻滤波：一阶 IIR，只给 PI 和前馈用；上报保持原始值 */
     tasks->id_flt += (Id - tasks->id_flt) >> CUR_FB_IIR_SHIFT;
@@ -422,14 +415,13 @@ static void current_loop_task(void)                 /* 电流环任务 */
     }
     /* 电流环正式运行 */
     if (tasks->mode == Mode_Open_Loop) {
-        vq = tasks->target;                     /* 已是 Q15：1.0 pu = 母线/√3 */
+        vq = tasks->target;                        /* 已是 Q15：1.0 pu = 母线/√3 */
         vd = 0;
     } else {
         vd = lt_pi_update(PID_ID, id_fb);          /* 输出 Q15 电压标幺（1.0 pu = 母线/√3）*/
         if (tasks->mode == Mode_Ramp_Torque) {
             /* 斜坡转矩：20kHz 逐拍推 iq 给定，阶跃指令不产生冲击 */
-            lt_pid_set_target(PID_IQ,
-                             lt_ramp_update(RAMP_TORQUE_IDX) >> TORQUE_RAMP_SHIFT);
+            lt_pid_set_target(PID_IQ, lt_ramp_update(RAMP_TORQUE_IDX) >> TORQUE_RAMP_SHIFT);
         }
         vq = lt_pi_update(PID_IQ, iq_fb);
 #if DQ_DECOUPLE
@@ -456,45 +448,40 @@ static void current_loop_task(void)                 /* 电流环任务 */
 
 static void speed_loop_task(void)                   /* 速度环任务 */
 {
-    int32_t speed_pll = lt_speed_get(SPD_IDX_PLL);  /* PLL：全速域有效，兼做切换判据与过速保护 */
-    int32_t speed_t   = lt_speed_get(SPD_IDX_T);    /* T 法：低速专用 */
+    int32_t speed_pll = lt_speed_get(SPEED_IDX_PLL);  /* PLL：全速域有效，兼做切换判据与过速保护 */
+    int32_t speed_t   = lt_speed_get(SPEED_IDX_T);    /* T 法：低速专用 */
     tasks_mode_t mode = tasks->mode;
 
     /* 低速切 T 法：40RPM 进、60RPM 出（滞环），判据固定用 PLL */
-    uint8_t use_t = tasks->spd_use_t;
+    uint8_t use_t = tasks->speed_use_t;
     if (use_t) {
-        if (speed_pll > SPD_T_OFF_CPS || speed_pll < -SPD_T_OFF_CPS)   use_t = 0;
+        if (LT_OVER_RANGE(speed_pll, SPEED_T_OFF_CPS))   use_t = 0;
     } else {
-        if (speed_pll < SPD_T_ON_CPS  && speed_pll > -SPD_T_ON_CPS)    use_t = 1;
+        if (!LT_OVER_RANGE(speed_pll, SPEED_T_ON_CPS))   use_t = 1;
     }
-    if (use_t && speed_t == 0 &&
-        (speed_pll > SPD_T_BLIND_CPS || speed_pll < -SPD_T_BLIND_CPS))
-        use_t = 0;                              /* T 法瞎了（窗口一直超时）：退回 PLL */
-    if (use_t != tasks->spd_use_t) {                /* 只在切换那一拍改增益 */
-        tasks->spd_use_t = use_t;
-        if (use_t) lt_pid_set(PID_SPEED, SPEED_KP_T_Q15, SPEED_KI_T_Q15, 0);
-        else       lt_pid_set(PID_SPEED, SPEED_KP_Q15,   SPEED_KI_Q15,   0);
-    }
+    /* T 法出错（窗口一直超时）：退回 PLL */
+    if (use_t && speed_t == 0 && LT_OVER_RANGE(speed_pll, SPEED_T_BLIND_CPS))   use_t = 0;
+    tasks->speed_use_t = use_t;                   /* 切换反馈源 */
 
-    int32_t speed_fb      = tasks->spd_use_t ? speed_t : speed_pll;
+    int32_t speed_fb      = use_t ? speed_t : speed_pll;
     int32_t speed_q24     = CNT_TO_Q24(speed_fb);
     int32_t speed_pll_q24 = CNT_TO_Q24(speed_pll);
     int32_t speed_ref_q24 = tasks->speed_ref_q24;   /* 参考速度给定 */
     /* 测速结果上报，并进行过速保护判断：±OVER_SPEED_Q24 */
     tasks_info->speed     = speed_t;                /* T 法原始值：上位机要对比时用它 */
     /* 上报速度单独低通：只影响上报曲线，环路反馈仍用原始值 */
-    int32_t sp_rep = speed_fb;
-    if (!tasks->spd_use_t &&
-        sp_rep < SPEED_REP_DEADBAND_CPS && sp_rep > -SPEED_REP_DEADBAND_CPS)
-        sp_rep = 0;                                     /* PLL 死区内没有有效读数；T 法不设这个死区 */
-    tasks->speed_rep_flt += (sp_rep - tasks->speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
+    int32_t speed_rep     = speed_fb;
+    int32_t speed_rep_flt = tasks->speed_rep_flt; 
+    /* PLL 死区内没有有效读数；T 法不设这个死区 */
+    if (!tasks->speed_use_t &&  !LT_OVER_RANGE(speed_rep, SPEED_REP_DEADBAND_CPS))  speed_rep = 0;                             
+    speed_rep_flt += (speed_rep - speed_rep_flt) >> SPEED_REP_IIR_SHIFT;
     /* 移位 IIR 有粘滞：输入已为 0 时别让状态卡在 ±2^N 内回不到 0 */
-    if (sp_rep == 0 &&
-        tasks->speed_rep_flt > -(1 << SPEED_REP_IIR_SHIFT) &&
-        tasks->speed_rep_flt <  (1 << SPEED_REP_IIR_SHIFT))
-        tasks->speed_rep_flt = 0;
-    tasks_info->speed_pll = tasks->speed_rep_flt;
-    if (speed_pll_q24 > OVER_SPEED_Q24 || speed_pll_q24 < -OVER_SPEED_Q24) {
+    if (speed_rep == 0 && !LT_OVER_RANGE(speed_rep_flt, 1 << SPEED_REP_IIR_SHIFT))  speed_rep_flt = 0;
+    tasks_info->speed_pll = speed_rep_flt;
+    tasks->speed_rep_flt  = speed_rep_flt;
+    tasks->speed_use_t = use_t;   
+    /* 过速保护 */
+    if (LT_OVER_RANGE(speed_pll_q24, OVER_SPEED_Q24)) {
         _protect_trip(LT_ERR_OVER_SPEED);
     }
     if (lt_fsm_get() != State_Running)      return;
@@ -505,26 +492,21 @@ static void speed_loop_task(void)                   /* 速度环任务 */
 
         /* 速度给定收到 0、且实测速度也进了窗口 → 清占空比（此刻反电势已可忽略），进 Stop */
         if (speed_ref_q24 == 0 &&
-            speed_q24 <= STOP_DONE_Q24 && speed_q24 >= -STOP_DONE_Q24) {
+            !LT_OVER_RANGE(speed_q24, STOP_DONE_Q24)) {
             control_tasks_clear();              /* 停稳：清运行态，下次启动从干净状态起 */
             ltm_pwm_set_dutys(0, 0, 0);
             lt_fsm_update(Event_Stop);          /* 停完 → fsm 进 Stop，mode 停在 Mode_Stop */
             return;
         }
     } else {
-        if (mode == Mode_Open_Loop || mode == Mode_Torque ||
-            mode == Mode_Ramp_Torque)           return;
-
         /* 斜坡速度：目标按 SPEED_RAMP_STEP_Q24 逼近，阶跃指令不产生冲击 */
         if (mode == Mode_Ramp_Speed) {
             speed_ref_q24 = lt_ramp_update(RAMP_SPEED_IDX);
-        }
+        } else if (mode != Mode_Speed) return;   /* 非模式，直接返回 */
     }
-    /* 速度模式：speed_ref_q24 由 control_tasks_set 直接写；
-     * 位置模式：由位置环逐拍写 */
 
     /* 速度环 PI：给定与反馈都是 Q24 圈/s */
-    speed_ref_q24 = _ref_limit(speed_ref_q24);            /* 给定限幅：只认合法转速范围 */
+    speed_ref_q24  = _ref_limit(speed_ref_q24);            /* 给定限幅：只认合法转速范围 */
     lt_pid_set_target(PID_SPEED, speed_ref_q24);
     int32_t iq_q15 = lt_pi_update(PID_SPEED, speed_q24) >> 9;   /* Q24 → Q15 */
 
@@ -542,8 +524,7 @@ static void speed_loop_task(void)                   /* 速度环任务 */
 #if COGGING_COMP_ENABLE
     /* 齿槽前馈：按绝对位置查表，正反转都用表原值抵消；同样受速度死区门控，
      * 直接叠 Q15 标幺 */
-    if (lt_cogging_is_done() && (speed_ref_q24 >  FRICTION_FF_DEADBAND_Q24 ||
-                                 speed_ref_q24 < -FRICTION_FF_DEADBAND_Q24)) {
+    if (lt_cogging_is_done() && LT_OVER_RANGE(speed_ref_q24, FRICTION_FF_DEADBAND_Q24)) {
         iq_q15 += lt_cogging_get(ltm_enc_get_count());
     }
 #endif
@@ -573,7 +554,7 @@ static void position_loop_task(void)
 
     /* Q24 只覆盖 ±128 圈，多圈 count 超范围先夹住再换算——否则 CNT_TO_Q24 撑爆 int32(UB)。
      * 速度模式跑久 / 位置跑飞都会让 |pos_cnt| 超 ±120 圈，此时位置环失效 */
-    if (pos_cnt >= POS_CNT_MAX || pos_cnt <= -POS_CNT_MAX)  return;
+    if (LT_OVER_RANGE(pos_cnt, POS_CNT_MAX))  return;
     int32_t pos_q24 = CNT_TO_Q24(pos_cnt);          /* 折算到 Q24 圈值 */
 
     /* 规划器 Unit 也是 Q24 圈值，和位置环同基：输出直接当给定，不用换算。

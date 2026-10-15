@@ -5,7 +5,6 @@
 #include "common/tasks_param_def.h"
 
 /* 对称范围判断：超出 ±max 为真 */
-#define LT_OVER_RANGE(v, max)   ((v) > (max) || (v) < -(max))
 /* 超范围直接返回 LT_ERR_OVER_RANGE */
 #define LT_REQUIRE_RANGE(v, max) \
     do { if (LT_OVER_RANGE(v, max)) return LT_ERR_OVER_RANGE; } while (0)
