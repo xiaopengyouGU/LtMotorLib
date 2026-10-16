@@ -8,7 +8,18 @@
 cmake_minimum_required(VERSION 3.20)
 
 get_filename_component(LTM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
-set(CMAKE_TOOLCHAIN_FILE ${LTM_ROOT}/cmake/toolchain_arm.cmake)
+
+# 板级映射：HAL SDK 目录 / 工具链 / 链接脚本的唯一出处。必须在 project() 之前选定
+# 工具链——否则换板后仍按固定档位编指令集（M33 的代码在 M4F 上非法）。
+if(NOT LTM_FOC_BOARD)
+    message(FATAL_ERROR "未指定板级配置：-DLTM_FOC_BOARD=<board>（现有：ra6m4、stm32g474）")
+endif()
+set(LTM_BOARD_CMAKE "${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake")
+if(NOT EXISTS "${LTM_BOARD_CMAKE}")
+    message(FATAL_ERROR "缺少板级映射 ${LTM_BOARD_CMAKE}（需定义 LTM_HAL_SDK_DIR / LTM_BOARD_TOOLCHAIN）")
+endif()
+include("${LTM_BOARD_CMAKE}")
+set(CMAKE_TOOLCHAIN_FILE ${LTM_BOARD_TOOLCHAIN})
 
 project(LTM_FOC VERSION 1.0.0 LANGUAGES C)
 
@@ -16,25 +27,12 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
 set(BIN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 set(LTMFOC_VERSION "${PROJECT_VERSION}" CACHE STRING "LTM_FOC 版本号")
 
-# 板级配置：boards/<board>/user_param_def.h 提供机型参数
-if(NOT LTM_FOC_BOARD)
-    message(FATAL_ERROR "未指定板级配置：-DLTM_FOC_BOARD=<board>（现有：ra6m4）")
-endif()
-set(LTM_FOC_PARAM_H "${LTM_ROOT}/boards/${LTM_FOC_BOARD}/user_param_def.h")
+# 机型参数：板级 user_param_def.h（路径由 board.cmake 给出）
+set(LTM_FOC_PARAM_H "${LTM_BOARD_PARAM_H}")
 if(NOT EXISTS "${LTM_FOC_PARAM_H}")
     message(FATAL_ERROR "找不到板级参数文件：${LTM_FOC_PARAM_H}")
 endif()
 message(STATUS "LTM_FOC 板级: ${LTM_FOC_BOARD}")
-
-# 板级映射：HAL SDK 目录 / 工具链 / 链接脚本的唯一出处。
-# FOC 库要靠它定位 HAL 头（LTM_HAL_SDK_DIR）。原来这里写死 ../../LTM_HAL/ltm_hal_ra6m4/bin：
-#   1) LTM_FOC/../.. 是仓库的上一级 -> 指到迁移前的旧目录，头文件用的是老的；
-#   2) 板名写死 ra6m4 -> 换板后仍然编译 ra6m4 的 HAL 头（满量程/编码器分辨率全错）。
-set(LTM_BOARD_CMAKE "${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake")
-if(NOT EXISTS "${LTM_BOARD_CMAKE}")
-    message(FATAL_ERROR "缺少板级映射 ${LTM_BOARD_CMAKE}（需在其中定义 LTM_HAL_SDK_DIR）")
-endif()
-include("${LTM_BOARD_CMAKE}")
 
 # LTM_CTRL 以子项目方式并入：同一构建图、同一工具链，改 CTRL 源码即触发重建
 add_subdirectory(${LTM_ROOT}/LTM_CTRL ${CMAKE_BINARY_DIR}/ltm_ctrl)
