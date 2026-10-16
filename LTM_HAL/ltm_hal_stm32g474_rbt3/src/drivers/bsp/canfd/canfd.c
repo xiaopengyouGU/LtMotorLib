@@ -4,7 +4,7 @@
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 CAN-FD（FDCAN1，PA11_RX/PA12_TX）
  *                             仲裁段 1Mbps + 数据段 2Mbps（内核时钟 PCLK1 = 170MHz）
- * 2026-09-02     Lvtou        CAN-FD 引脚调整：FDCAN1 -> PB8_RX/PB9_TX（原 PA11/PA12）
+ * 2026-10-16     Lvtou        CAN 引脚核对：FDCAN1 实际为 PA11_RX/PA12_TX（AF9），此前 PB8/PB9 的调整未采用
  */
 #include "bsp/canfd/canfd.h"
 #include "stm32g4xx_hal.h"

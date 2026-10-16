@@ -119,7 +119,7 @@ int flash_read(uint32_t addr, uint8_t *data, uint32_t len)
 }
 
 /* BOOT0 来源切换（一次性）：PB8/BOOT0 引脚采样 -> nBOOT0 选项位
- * 目的：释放 PB8/BOOT0 焊盘给 FDCAN1_RX（CAN-FD），复位瞬间不再受引脚电平影响
+ * 目的：释放 PB8/BOOT0 焊盘供板级 GPIO 使用（CAN-FD 实际走 PA11/PA12），复位瞬间不再受引脚电平影响
  * 目标配置：nSWBOOT0=0（BOOT0 取 nBOOT0 选项位）+ nBOOT0=1（主 Flash 启动）
  * 首次执行：编程选项字节并 OBL_LAUNCH 复位一次；此后每次上电直接返回 0
  * 如需恢复引脚采样：用 STM32CubeProgrammer 写回 nSWBOOT0=1 即可 */

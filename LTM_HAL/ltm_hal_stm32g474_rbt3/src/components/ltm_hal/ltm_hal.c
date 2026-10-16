@@ -40,7 +40,7 @@ void ltm_hal_init(void)
     led_init();         /* LED */
     pwm_init();         /* 三相 PWM（先启动计数器，保证 ADC/编码器触发链路建立） */
     encoder_init();     /* MT6835 绝对值编码器（21bit，仅主轴 SPI1 + DMA） */
-    adc_init();         /* ADC1（注入组电流 + 规则组母线/温度） */
+    adc_init();         /* ADC：三 ADC 注入组电流 + ADC2 规则组母线/温度 */
 
     /* 全局中断使能：各外设 IRQ 已逐个使能，最后统一放开，
      * 保证中断只在全部初始化完成后开始触发（含 BootLoader 软跳转场景） */

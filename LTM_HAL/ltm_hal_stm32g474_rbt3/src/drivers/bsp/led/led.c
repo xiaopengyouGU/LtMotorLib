@@ -2,6 +2,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-19     Lvtou        STM32G474 LED：板级运动控制信号 GPIO 映射
+ * 2026-10-16     Lvtou        引脚按实机重排：RUN=PB9、ON/OFF=PB7、STOP=PB6、ERR=PC12
  */
 #include "bsp/led/led.h"
 #include "stm32g4xx_hal.h"

@@ -10,6 +10,8 @@
  *                             （RANK_1/2/3 = 6/12/18...），不能 +i 递增，
  *                             否则 SQR 被写乱，VBUS/温度通道全部失效
  * 2026-09-19     Lvtou        修改ADC引脚和转换系数
+ * 2026-10-16     Lvtou        按实机重排 ADC 引脚/通道：IA=PB1(ADC3_IN1)、IB=PA1(ADC2_IN2)、
+ *                             IC=PA0(ADC1_IN1)；规则组母线/MOS 温度/电机温度改由 ADC2 采样（DMA 请求换 ADC2）
  */
 #include "bsp/adc/adc.h"
 #include "bsp/encoder/drv_spi.h"
@@ -36,9 +38,9 @@ static const uint16_t ntc_raw_table[NTC_TABLE_LEN] = {
     3635,
 };
 
-static ADC_HandleTypeDef g_adc1;                    /* ADC1：IA 注入 + 规则组母线/温度 DMA */
-static ADC_HandleTypeDef g_adc2;                    /* ADC2：IB 注入 */
-static ADC_HandleTypeDef g_adc3;                    /* ADC3：IC 注入 */
+static ADC_HandleTypeDef g_adc1;                    /* ADC1：注入 IC */
+static ADC_HandleTypeDef g_adc2;                    /* ADC2：注入 IB + 规则组母线/温度 DMA */
+static ADC_HandleTypeDef g_adc3;                    /* ADC3：注入 IA */
 static DMA_HandleTypeDef g_dma_seq;
 
 static volatile uint16_t s_seq_buff[ADC_SEQ_LEN];   /* 规则组 DMA 缓冲：母线/温度 */
@@ -77,18 +79,18 @@ void adc_init(void)
     /* 三颗 ADC 注入组完全同构：_adc_inj_init 统一完成
      * 基座配置（ADCCLK=42.5MHz/12bit/单端）+ 校准 + 注入单通道序列；
      * 差异仅 Instance、规则组形态（扫描/队列长/DMA/触发）与注入触发源 */
-    _adc_inj_init(&g_adc1, ADC1, ADC_CURRENT_A_CHANNEL, ADC_EXTERNALTRIGINJEC_HRTIM_TRG5,
-                  ADC_SCAN_ENABLE, ADC_SEQ_LEN, ADC_EXTERNALTRIG_HRTIM_TRG1, ENABLE);   /* 规则 VBUS/温度 DMA + 注入 IA */
+    _adc_inj_init(&g_adc1, ADC1, ADC_CURRENT_C_CHANNEL, ADC_EXTERNALTRIGINJEC_HRTIM_TRG5,
+                  ADC_SCAN_DISABLE, 1U, ADC_EXTERNALTRIG_HRTIM_TRG5, DISABLE);          /* 仅注入 IC（PA0）*/
     _adc_inj_init(&g_adc2, ADC2, ADC_CURRENT_B_CHANNEL, ADC_EXTERNALTRIGINJEC_HRTIM_TRG5,
-                  ADC_SCAN_DISABLE, 1U, ADC_EXTERNALTRIG_HRTIM_TRG5, DISABLE);          /* 仅注入 IB */
-    _adc_inj_init(&g_adc3, ADC3, ADC_CURRENT_C_CHANNEL, ADC_EXTERNALTRIGINJEC_HRTIM_TRG9,
-                  ADC_SCAN_DISABLE, 1U, ADC_EXTERNALTRIG_HRTIM_TRG9, DISABLE);          /* 仅注入 IC（PB1）*/
+                  ADC_SCAN_ENABLE, ADC_SEQ_LEN, ADC_EXTERNALTRIG_HRTIM_TRG1, ENABLE);   /* 规则母线/MOS/电机温度 DMA + 注入 IB（PA1）*/
+    _adc_inj_init(&g_adc3, ADC3, ADC_CURRENT_A_CHANNEL, ADC_EXTERNALTRIGINJEC_HRTIM_TRG9,
+                  ADC_SCAN_DISABLE, 1U, ADC_EXTERNALTRIG_HRTIM_TRG9, DISABLE);          /* 仅注入 IA（PB1）*/
 
     /* DMA：规则组结果连续搬运（循环，无需重装）*/
     __HAL_RCC_DMA1_CLK_ENABLE();
     __HAL_RCC_DMAMUX1_CLK_ENABLE();
     g_dma_seq.Instance                = DMA1_Channel1;
-    g_dma_seq.Init.Request            = DMA_REQUEST_ADC1;
+    g_dma_seq.Init.Request            = DMA_REQUEST_ADC2;
     g_dma_seq.Init.Direction          = DMA_PERIPH_TO_MEMORY;
     g_dma_seq.Init.PeriphInc          = DMA_PINC_DISABLE;
     g_dma_seq.Init.MemInc             = DMA_MINC_ENABLE;
@@ -97,11 +99,11 @@ void adc_init(void)
     g_dma_seq.Init.Mode               = DMA_CIRCULAR;
     g_dma_seq.Init.Priority           = DMA_PRIORITY_LOW;
     HAL_DMA_Init(&g_dma_seq);
-    __HAL_LINKDMA(&g_adc1, DMA_Handle, g_dma_seq);
+    __HAL_LINKDMA(&g_adc2, DMA_Handle, g_dma_seq);
 
     _adc_seq_init();     /* 规则组：VBUS/温度，DMA 循环搬运 */
 
-    HAL_ADC_Start_DMA(&g_adc1, (uint32_t *)s_seq_buff, ADC_SEQ_LEN);
+    HAL_ADC_Start_DMA(&g_adc2, (uint32_t *)s_seq_buff, ADC_SEQ_LEN);
     HAL_ADCEx_InjectedStart(&g_adc1);                        /* 注入组就绪，等待 HRTIM 触发 */
     HAL_ADCEx_InjectedStart(&g_adc2);
     HAL_ADCEx_InjectedStart(&g_adc3);
@@ -175,10 +177,10 @@ void ADC1_2_IRQHandler(void)
 
     uint16_t *curr_buf = adc->curr_buf;
 
-    /* 注入数据：三颗 ADC 各自 JDR1（同步触发，同一拍 A/B/C）*/
-    curr_buf[0] = (uint16_t)(ADC1->JDR1 & 0xFFFF);
+    /* 注入数据：三颗 ADC 各自 JDR1（同步触发，同一拍 A/B/C）：IA 在 ADC3、IB 在 ADC2、IC 在 ADC1 */
+    curr_buf[0] = (uint16_t)(ADC3->JDR1 & 0xFFFF);
     curr_buf[1] = (uint16_t)(ADC2->JDR1 & 0xFFFF);
-    curr_buf[2] = (uint16_t)(ADC3->JDR1 & 0xFFFF);
+    curr_buf[2] = (uint16_t)(ADC1->JDR1 & 0xFFFF);
 
     /* 电流拷贝后立即发起编码器 SPI 读取（一拍一次）：帧锚定在谷底触发点，
      * 回调读取恒为上一拍完整数据——这是一拍补偿的前提（详见 drv_spi.c 时序契约）*/
@@ -216,18 +218,18 @@ static void _adc_pins_init(void)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
-    /* PC0/PC1/PC3：IA/IB/VBUS */
+    /* PC0/PC1/PC3：电机温度/母线电压/MOS 温度（ADC2 规则组）*/
     gpio.Pin  = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_3;
     gpio.Mode = GPIO_MODE_ANALOG;
     gpio.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &gpio);
 
-/* PB1：IC（ADC3_IN1，第三相采样引脚，原 Motor ERR 已挪至 PB6）*/
+    /* PB1：IA（ADC3_IN1）*/
     gpio.Pin  = GPIO_PIN_1;
     HAL_GPIO_Init(GPIOB, &gpio);
 
-    /* PA0/PA2：电机温度/驱动器温度（PA1 释放）*/
-    gpio.Pin  = GPIO_PIN_0 | GPIO_PIN_2;
+    /* PA0/PA1：IC/IB（ADC1_IN1 / ADC2_IN2）*/
+    gpio.Pin  = GPIO_PIN_0 | GPIO_PIN_1;
     HAL_GPIO_Init(GPIOA, &gpio);
 }
 
@@ -251,14 +253,14 @@ static void _adc_seq_init(void)
     for (uint8_t i = 0; i < ADC_SEQ_LEN; i++) {
         ch.Channel = seq_ch[i];
         ch.Rank    = seq_rank[i];
-        HAL_ADC_ConfigChannel(&g_adc1, &ch);
+        HAL_ADC_ConfigChannel(&g_adc2, &ch);
     }
 }
 
 /* 注入 ADC 统一初始化：基座配置 + 校准 + 注入单通道电流序列
  * 三颗 ADC 同构，差异仅 Instance/规则组形态/触发源：
  *   - 基座：ADCCLK=170/4=42.5MHz，12bit 右对齐，硬件触发单次扫描，溢出覆盖
- *   - 规则组：ADC1 扫描 3 通道（VBUS/温度）+ DMA 连续；ADC2/3 不使用
+ *   - 规则组：ADC2 扫描 3 通道（母线/MOS 温度/电机温度）+ DMA 连续；ADC1/3 不使用
  *   - 注入组：单通道电流（JDR1），HRTIM TRGx 上升沿触发，JEOS 中断 = 电流环
  *     （G474 注入触发映射：TRG1 仅 ADC3/4/5；ADC1/ADC2 注入用 TRG5/TRG9 等）*/
 static void _adc_inj_init(ADC_HandleTypeDef *adc, ADC_TypeDef *instance,

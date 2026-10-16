@@ -13,18 +13,18 @@
 #define ADC_VBUS_PER_LSB			0.0241184f  /* 3.3f/4096 * 29.936 : 每 LSB 对应的电压值(V) */
 
 /* ADC 引脚通道映射（12bit，三 ADC 同步采样）：
- *   IA -> ADC1_IN6  (PC0)
- *   IB -> ADC2_IN7  (PC1)
- *   IC -> ADC3_IN1  (PB0)
+ *   IA -> ADC3_IN1  (PB1)
+ *   IB -> ADC2_IN2  (PA1)
+ *   IC -> ADC1_IN1  (PA0)
  * 三颗 ADC 注入组由 HRTIM TRG5/TRG9 触发（TimerA 谷底；ADC1/ADC2 共用 TRG5）+ 相同采样时间，
  * 同一触发沿同时刻采样，硬件保证 Ia+Ib+Ic=0（配合温漂偏置扣除）。
  */
-#define ADC_CURRENT_A_CHANNEL       ADC_CHANNEL_6       /* PC0：A 相电流 -> ADC1 */
-#define ADC_CURRENT_B_CHANNEL       ADC_CHANNEL_7       /* PC1：B 相电流 -> ADC2 */
-#define ADC_CURRENT_C_CHANNEL       ADC_CHANNEL_12      /* PB0：C 相电流 -> ADC3（IN12）*/
-#define ADC_VBUS_CHANNEL            ADC_CHANNEL_9       /* PC3：母线电压 -> ADC1 */
-#define ADC_TEMP_MOTOR_CHANNEL      ADC_CHANNEL_1       /* PA0：电机温度 -> ADC1（IN1）*/
-#define ADC_TEMP_DRIVER_CHANNEL     ADC_CHANNEL_2       /* PA1：驱动器温度 -> ADC1（IN2）*/
+#define ADC_CURRENT_A_CHANNEL       ADC_CHANNEL_1       /* PB1：A 相电流 -> ADC3（IN1）*/
+#define ADC_CURRENT_B_CHANNEL       ADC_CHANNEL_2       /* PA1：B 相电流 -> ADC2（IN2）*/
+#define ADC_CURRENT_C_CHANNEL       ADC_CHANNEL_1       /* PA0：C 相电流 -> ADC1（IN1）*/
+#define ADC_VBUS_CHANNEL            ADC_CHANNEL_7       /* PC1：母线电压 -> ADC2（IN7）*/
+#define ADC_TEMP_MOTOR_CHANNEL      ADC_CHANNEL_6       /* PC0：电机温度 -> ADC2（IN6）*/
+#define ADC_TEMP_DRIVER_CHANNEL     ADC_CHANNEL_9       /* PC3：MOS 温度 -> ADC2（IN9）*/
 
 /* Q15 标幺接口（与 lt_foc_update 同口径）：
  * 电流 1.0 pu = LTM_ADC_FULL_SCALE_CURRENT_A（33.0A = 半量程 2048 LSB × 0.0161133A/LSB）
