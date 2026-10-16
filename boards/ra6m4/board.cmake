@@ -8,3 +8,4 @@ set(LTM_BOARD_TOOLCHAIN  "${LTM_ROOT}/cmake/toolchain_arm.cmake"          CACHE 
 set(LTM_BOARD_PARAM_H    "${CMAKE_CURRENT_LIST_DIR}/user_param_def.h"     CACHE FILEPATH "机型参数（编 FOC 库用）")
 set(LTM_BOARD_LINKER     "${CMAKE_CURRENT_LIST_DIR}/linker/fsp.ld"        CACHE FILEPATH "链接脚本")
 set(LTM_BOARD_DEFINES  _RENESAS_RA_ _RA_CORE=CM33 _RA_ORDINAL=1 CACHE STRING "该板的 MCU 编译定义")
+set(LTM_BOARD_JLINK_DEVICE "R7FA6M4AF"                                     CACHE STRING   "J-Link device (flash)")

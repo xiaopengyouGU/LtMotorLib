@@ -12,6 +12,7 @@
   python script.py -b --board xxx   # 指定板级配置（默认 ra6m4）
 """
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -28,7 +29,20 @@ BUILD    = os.path.join(ROOT, "build")
 BIN      = os.path.join(ROOT, "bin")
 ELF      = os.path.join(BIN, "ltm_foc_canfd.elf")
 HEX      = os.path.join(BIN, "ltm_foc_canfd.hex")
-DEVICE   = "R7FA6M4AF"          # J-Link 器件名（当前板级 ra6m4）
+RE_JLINK_DEVICE = re.compile(r'set\(\s*LTM_BOARD_JLINK_DEVICE\s+"([^"]+)"')
+
+
+def board_device(board):
+    """J-Link 器件名取自板级配置 boards/<board>/board.cmake 的 LTM_BOARD_JLINK_DEVICE。"""
+    p = os.path.join(LTM_ROOT, "boards", board, "board.cmake")
+    try:
+        with open(p, encoding="utf-8") as f:
+            m = RE_JLINK_DEVICE.search(f.read())
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    sys.exit("[FAIL] %s 未定义 LTM_BOARD_JLINK_DEVICE（J-Link 器件名）" % p)
 SPEED    = "1000"               # SWD 时钟 kHz
 
 
@@ -65,7 +79,7 @@ def find_jlink():
     return None
 
 
-def flash(jlink):
+def flash(jlink, board):
     img = HEX if os.path.isfile(HEX) else ELF
     if not os.path.isfile(img):
         print("[FAIL] 找不到 %s，请先构建（-b）" % img)
@@ -78,7 +92,7 @@ def flash(jlink):
               'loadfile "%s"\n'
               "r\n"
               "g\n"
-              "qc\n") % (SPEED, DEVICE, os.path.abspath(img).replace("\\", "/"))
+              "qc\n") % (SPEED, board_device(board), os.path.abspath(img).replace("\\", "/"))
     sf = os.path.join(ROOT, "flash.jlink")
     with open(sf, "w") as f:
         f.write(script)
@@ -114,11 +128,11 @@ def main():
     if args.run:
         if not build(args.board):
             sys.exit("[FAIL] 构建失败")
-        if not flash(jlink):
+        if not flash(jlink, args.board):
             sys.exit("[FAIL] 烧录失败")
         print("[OK] 构建 + 烧录完成")
     elif args.only_flash:
-        if not flash(jlink):
+        if not flash(jlink, args.board):
             sys.exit("[FAIL] 烧录失败")
         print("[OK] 烧录完成")
     elif args.build:
