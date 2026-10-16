@@ -5,7 +5,7 @@
 # 作用：装好 CMake + Make + 宿主 GCC + ARM 交叉工具链，检查工具链可用，然后
 #       调 tools/ci.py 跑完整构建与主机侧测试。
 #
-# 用法（GitHub Actions / Gitee 流水线 / 本地 Linux 都一样）：
+# 用法（GitHub Actions / 任意 Linux CI / 本地 Linux 都一样）：
 #   bash tools/ci_bootstrap.sh
 #
 # ARM 工具链优先用发行版包（快、走内网镜像）；先用 probe 检查头文件与

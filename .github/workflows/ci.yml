@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 工具链准备 + 构建 + 主机测试都在脚本里（与 Gitee 流水线共用同一份）
+      # 工具链准备 + 构建 + 主机测试都在脚本里（本地 Linux 也是同一条命令）
       - name: 引导工具链 + 构建 + 主机测试
         run: bash tools/ci_bootstrap.sh
 

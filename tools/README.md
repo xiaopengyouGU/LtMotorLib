@@ -33,8 +33,10 @@ GNU Arm Embedded / xpack 版）；调 `tools/ci.py`。
 | 平台 | 做法 |
 |---|---|
 | GitHub Actions | `.github/workflows/ci.yml` 已配好，push / PR 自动跑 `bash tools/ci_bootstrap.sh` |
-| Gitee 流水线 | 仓库页 → 服务 → 流水线 → 新建流水线：拉本仓库源码，加一个「执行 Shell / 命令」任务，命令填 `bash tools/ci_bootstrap.sh`；触发方式选「代码提交触发」即可 |
 | 本地 Linux | 直接 `bash tools/ci_bootstrap.sh`（脚本自己装依赖，可加 `--only` 只跑部分步骤） |
+| 其它 CI（Jenkins / 自建 runner…） | 只要有一台 Linux 机器，把命令设成 `bash tools/ci_bootstrap.sh` 即可 |
+
+> Gitee 的流水线（Gitee Go）是**收费服务**，本仓库没有接；gitee 只作为代码镜像使用。
 
 ## ltm_example.py —— 例程构建/烧录公共库
 
