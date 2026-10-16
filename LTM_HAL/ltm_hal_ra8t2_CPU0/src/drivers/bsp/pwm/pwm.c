@@ -22,26 +22,22 @@ void pwm_init(void)     /* 三相 PWM 初始化 */
     R_GPT_THREE_PHASE_DutyCycleSet(htim_ctrl, &htim_dutys);
 }
 
-#define DUTY_MIN    0.0f
-#define DUTY_MAX    0.95f            /* 下桥臂采样FOC，最高输出占空比 */
+#define DUTY_MIN    0
+#define DUTY_MAX    31130            /* 0.95 × 32768：下桥臂采样 FOC，最高输出占空比 */
 
 #define GET_MAX(duty)    ((duty) < DUTY_MAX ? (duty) : DUTY_MAX)
 #define GET_MIN(duty)    ((duty) > DUTY_MIN ? (duty) : DUTY_MIN)
-#define CLAMP_DUTY(duty) (1.0f - GET_MAX(GET_MIN(duty)))
+#define CLAMP_DUTY(duty) (32768 - GET_MAX(GET_MIN(duty)))
 
-void pwm_set_dutys(float dutyA, float dutyB, float dutyC)
+void pwm_set_dutys(int32_t dutyA, int32_t dutyB, int32_t dutyC)
 {
-    /* 占空比限幅 */
-    dutyA = CLAMP_DUTY(dutyA);    
-    dutyB = CLAMP_DUTY(dutyB); 
-    dutyC = CLAMP_DUTY(dutyC); 
-    
-    /* 更新三相占空比 */
+    /* Q15 占空比限幅 + 取反（下桥臂采样），再折算成 GPT 比较值：
+     * 热路径一次 32 位乘 + 右移 15，无浮点；32768 × 5000 = 1.6e8 < 2^31，不溢出 */
     three_phase_duty_cycle_t  htim_dutys;                          /* 占空比配置模块  */
-    htim_dutys.duty[0] = (uint32_t)(dutyA * FOC_COUNT_PERIOD);     /* A相 */   
-    htim_dutys.duty[1] = (uint32_t)(dutyB * FOC_COUNT_PERIOD);     /* B相 */
-    htim_dutys.duty[2] = (uint32_t)(dutyC * FOC_COUNT_PERIOD);     /* C相 */
-    R_GPT_THREE_PHASE_DutyCycleSet(htim_ctrl, &htim_dutys); 
+    htim_dutys.duty[0] = ((uint32_t)CLAMP_DUTY(dutyA) * FOC_COUNT_PERIOD) >> 15;   /* A相 */
+    htim_dutys.duty[1] = ((uint32_t)CLAMP_DUTY(dutyB) * FOC_COUNT_PERIOD) >> 15;   /* B相 */
+    htim_dutys.duty[2] = ((uint32_t)CLAMP_DUTY(dutyC) * FOC_COUNT_PERIOD) >> 15;   /* C相 */
+    R_GPT_THREE_PHASE_DutyCycleSet(htim_ctrl, &htim_dutys);
 }
 
 void pwm_start(void)            /* 启动 pwm 输出 */

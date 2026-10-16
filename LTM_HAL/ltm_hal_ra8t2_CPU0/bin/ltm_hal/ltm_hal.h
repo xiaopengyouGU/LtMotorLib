@@ -6,6 +6,17 @@
 /*==================== 底层常量（与 BSP 保持一致，供上层使用） ====================*/
 #define LTM_ENC_CPR             262144U        /* 编码器单圈分辨率（18位） */
 #define LTM_ENC_RAD_PER_COUNT   2.39674e-5f    /* 2PI / ENCODER_CPR */
+#define LTM_ENC_ANGLE_PER_COUNT (360.0f / (float)LTM_ENC_CPR)
+
+/* Q15 标幺基准（1.0 pu = 下列满量程），与 ra6m4 / g474 版同口径：
+ * 电流：运放 20 倍 + 2mΩ 采样电阻，16bit 中位偏置 → 半量程 ±32768 LSB，
+ *       每 LSB 0.0012589A，1.0 pu = 32768 × 0.0012589 = 41.25 A
+ * 母线：分压比 29，12bit，每 LSB 0.0233643V → 1.0 pu = 4096 × 0.0233643 = 95.70 V */
+#define LTM_ADC_TEMP_PER_COUNT      (0.1f)     /* 温度接口单位：0.1℃ */
+#define LTM_ADC_FULL_SCALE_CURRENT_A (41.25f)
+#define LTM_ADC_FULL_SCALE_VOLTAGE_V (95.70f)
+#define LTM_ADC_CURRENT_PER_COUNT   (LTM_ADC_FULL_SCALE_CURRENT_A / 32768.0f)
+#define LTM_ADC_VOLTAGE_PER_COUNT   (LTM_ADC_FULL_SCALE_VOLTAGE_V / 32768.0f)
 
 /*==================== LED ====================*/
 typedef enum {
@@ -36,15 +47,15 @@ void ltm_uart_write_nonblock(uint8_t *buf, uint16_t len);
 void ltm_uart_set_rxcall(void (*rxcall)(uint8_t *buf, uint16_t len));
 
 /*==================== 三相 PWM ====================*/
-void ltm_pwm_set_dutys(float dutyA, float dutyB, float dutyC);
+void ltm_pwm_set_dutys(int32_t dutyA, int32_t dutyB, int32_t dutyC);  /* Q15：32768 = 100% */
 void ltm_pwm_start(void);
 void ltm_pwm_stop(void);
 
 /*==================== ADC ====================*/
 void ltm_adc_calibrate_zero(uint16_t samples);
-void ltm_adc_get_current(float *Ia, float *Ib, float *Ic);
-void ltm_adc_get_temp(float *motor_temp, float *driver_temp);
-void ltm_adc_get_vbus(float *vbus);
+void ltm_adc_get_current(int32_t *Ia, int32_t *Ib, int32_t *Ic);  /* Q15 标幺 */
+void ltm_adc_get_temp(int32_t *motor_temp, int32_t *driver_temp); /* 0.1℃ */
+void ltm_adc_get_vbus(int32_t *vbus);                             /* Q15 标幺 */
 void ltm_adc_set_callback(void (*callback)(void));
 
 /*==================== 编码器 ====================*/

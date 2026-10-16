@@ -41,11 +41,6 @@ HAL_BOARD = {
     "ltm_hal_ra8t2_CPU0":     "ra8t2",
 }
 
-# 共享例程按 Q15 接口写；仍是浮点接口的平台暂时不做例程
-HAL_NO_EXAMPLES = {
-    "ltm_hal_ra8t2_CPU0": "HAL 仍是浮点接口（未对齐 Q15），共享例程暂不支持",
-}
-
 
 def run(cmd):
     print(">>> " + " ".join(cmd))
@@ -190,9 +185,6 @@ def main():
 
     if args.no_examples:
         print("[skip] --no-examples：跳过 examples 的构建")
-        return
-    if name in HAL_NO_EXAMPLES:
-        print("[skip] %s：%s" % (name, HAL_NO_EXAMPLES[name]))
         return
     if not build_all_examples(board):
         sys.exit("[FAIL] 例程构建失败")

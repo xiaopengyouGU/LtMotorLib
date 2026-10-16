@@ -67,15 +67,15 @@ void ltm_uart_write_nonblock(uint8_t *buf, uint16_t len) { uart_write_nonblock(b
 void ltm_uart_set_rxcall(void (*rxcall)(uint8_t *buf, uint16_t len)) { uart_set_rxcall(rxcall); }
 
 /*==================== 三相 PWM ====================*/
-void ltm_pwm_set_dutys(float dutyA, float dutyB, float dutyC) { pwm_set_dutys(dutyA, dutyB, dutyC); }
+void ltm_pwm_set_dutys(int32_t dutyA, int32_t dutyB, int32_t dutyC) { pwm_set_dutys(dutyA, dutyB, dutyC); }
 void ltm_pwm_start(void)             { pwm_start(); }
 void ltm_pwm_stop(void)              { pwm_stop(); }
 
 /*==================== ADC ====================*/
 void ltm_adc_calibrate_zero(uint16_t samples) { adc_calibrate_zero(samples); }
-void ltm_adc_get_current(float *Ia, float *Ib, float *Ic) { adc_get_current(Ia, Ib, Ic); }
-void ltm_adc_get_temp(float *motor_temp, float *driver_temp) { adc_get_temp(motor_temp, driver_temp); }
-void ltm_adc_get_vbus(float *vbus)   { adc_get_vbus(vbus); }
+void ltm_adc_get_current(int32_t *Ia, int32_t *Ib, int32_t *Ic) { adc_get_current(Ia, Ib, Ic); }
+void ltm_adc_get_temp(int32_t *motor_temp, int32_t *driver_temp) { adc_get_temp(motor_temp, driver_temp); }
+void ltm_adc_get_vbus(int32_t *vbus)   { adc_get_vbus(vbus); }
 void ltm_adc_set_callback(void (*callback)(void)) { adc_set_callback(callback); }
 
 /*==================== 编码器 ====================*/

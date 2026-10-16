@@ -10,14 +10,12 @@ static adc_b_scan_cfg_t const *adc_scan_cfg = &g_adc0_scan_cfg;
 static elc_ctrl_t *elc_ctrl = &g_elc_ctrl;
 static elc_cfg_t const *elc_cfg = &g_elc_cfg;
 
-#define ABS(x)          (((x) >= 0.0f) ? (x) : (-x)) 
-
 /* 回调函数指针 */
 static void (*s_callback)(void) = NULL;
 
 /* ADC 采样结构体，0,1,2 ==> A,B,C */
 typedef struct {
-    float offset[3];        /* 三相零点偏置（原始值）*/
+    int32_t offset[3];      /* 三相零点偏置（原始计数）*/
     uint16_t curr_buf[3];   /* 三相电流采样（原始值）*/
     uint16_t temp_buf[3];   /* [0]: 母线电压, [1]: 电机温度, [2]: 驱动器温度（原始值）*/
     uint16_t calib_tar;     /* 目标校准采样次数 */
@@ -58,62 +56,69 @@ void adc_calibrate_zero(uint16_t samples)       /* 校准零点（阻塞模式�
     adc->calib_tar = samples;                   /* 更新校准采样次数目标值 */
 }
 
-/* 获取电流采样值，三相采样，由两相（大电流）重构剩余相电流 */
-void adc_get_current(float *Ia, float *Ib, float *Ic)
+/* 温度范围：10℃ ~ 90℃，2℃ 步进，共 41 点。表沿用 g474 板那套
+ * NCP18XH103F03RB（10k 下拉分压、12bit、3.3V）——ra8t2 板的 NTC/分压若不同，只换这张表 */
+#define NTC_TABLE_LEN     41
+#define NTC_TEMP_START   (10)
+#define NTC_TEMP_STEP     2
+
+static const uint16_t ntc_raw_table[NTC_TABLE_LEN] = {
+    1467, 1544, 1621, 1699, 1777, 1855, 1933, 2010,
+    2086, 2162, 2236, 2310, 2382, 2452, 2520, 2587,
+    2652, 2715, 2776, 2835, 2892, 2948, 3001, 3052,
+    3101, 3147, 3192, 3234, 3274, 3313, 3350, 3385,
+    3419, 3451, 3481, 3510, 3538, 3564, 3589, 3613,
+    3635,
+};
+
+static int32_t _ntc_temp(uint16_t raw)          /* 查表法温度读取，返回 0.1℃ */
+{
+    if (raw <= ntc_raw_table[0])                    return NTC_TEMP_START * 10;
+    if (raw >= ntc_raw_table[NTC_TABLE_LEN - 1])    return (NTC_TEMP_START + (NTC_TABLE_LEN - 1) * NTC_TEMP_STEP) * 10;
+    int lo = 0, hi = NTC_TABLE_LEN - 1;
+    while (hi - lo > 1) {                           /* 二分定位 raw 所在区间 */
+        int mid = (lo + hi) >> 1;
+        if (raw >= ntc_raw_table[mid])  lo = mid;
+        else                            hi = mid;
+    }
+    int32_t span = (int32_t)ntc_raw_table[hi] - (int32_t)ntc_raw_table[lo];
+    int32_t num  = ((int32_t)raw - (int32_t)ntc_raw_table[lo]) * (NTC_TEMP_STEP * 10);
+    return (NTC_TEMP_START + lo * NTC_TEMP_STEP) * 10 + num / span;
+}
+/* 获取电流采样值（Q15 标幺），三相采样，由两相（大电流）重构剩余相电流 */
+void adc_get_current(int32_t *Ia, int32_t *Ib, int32_t *Ic)
 {
     if (!Ia || !Ib || !Ic)                return;  /* 判空 */
-    adc_sample_t *adc  = &adc_sample;              /* 指针调用，直接进寄存器，性能更好 */
-    uint16_t *curr_buf = adc->curr_buf;
-    float    *offset   = adc->offset;
-    /* 读取 三相电流原始值 */
-    uint16_t a_raw = curr_buf[0];             /* A 相电流原始值 */
-    uint16_t b_raw = curr_buf[1];             /* B 相电流原始值 */
-    uint16_t c_raw = curr_buf[2];             /* C 相电流原始值 */
-	
-	if(!adc->calib_done){          /* 校准完毕之前，获取的电流按 0 算 */
-		*Ia = 0;
-		*Ib = 0;
-		*Ic = 0;						
-		return;
-	}
-    /* 扣除零点漂移，转换为电流值 (A)，注意是下桥臂采样，因此加个负号 */
-    float ia =  - ((float)a_raw - offset[0]) * ADC_CURRENT_PER_LSB;
-    float ib =  - ((float)b_raw - offset[1]) * ADC_CURRENT_PER_LSB;
-    float ic =  - (ia + ib);
-    // float ic =  - ((float)c_raw - offset[2]) * ADC_CURRENT_PER_LSB;
-    /* 某相电流在过零点附近，信噪比过低，误差大，可由剩余两相电流重构 */
-    // float abs_a = ABS(ia);
-    // float abs_b = ABS(ib);
-    // float abs_c = ABS(ic);
-    
-    // if (abs_a <= abs_b && abs_a <= abs_c) {         /* 重构 A 相电流 */
-    //     ia = -(ib + ic);
-    // } else if (abs_b <= abs_a && abs_b <= abs_c) {  /* 重构 B 相电流 */
-    //     ib = -(ia + ic);
-    // } else {                                        /* 重构 C 相电流 */      
-    //     ic = -(ia + ib);
-    // }
-    /* 返回重构后的三相电流 */
+    uint16_t *curr_buf = adc_sample.curr_buf;
+    int32_t  *offset   = adc_sample.offset;
+
+    if (!adc_sample.calib_done) {          /* 校准完毕之前，获取的电流按 0 算 */
+        *Ia = 0;
+        *Ib = 0;
+        *Ic = 0;
+        return;
+    }
+    /* 三相各自扣零点转 Q15：16bit 中位偏置，半量程 32768 LSB 正好映射到 32768（1.0 pu = 41.25A）；
+     * 下桥臂采样所以取负，C 相由 A/B 两相重构（C 相信噪比低）*/
+    int32_t ia = -((int32_t)curr_buf[0] - offset[0]);
+    int32_t ib = -((int32_t)curr_buf[1] - offset[1]);
+    int32_t ic = -(ia + ib);
     *Ia = ia;
     *Ib = ib;
     *Ic = ic;
 }
 
-void adc_get_temp(float *motor_temp, float *driver_temp)  /* 获取电机和驱动器温度 */
+void adc_get_temp(int32_t *motor_temp, int32_t *driver_temp)  /* 获取电机和驱动器温度（0.1℃）*/
 {
     if (!motor_temp || !driver_temp)    return;
-    adc_sample_t *adc  = &adc_sample;                     /* 指针调用，直接进寄存器，性能更好 */
-    uint16_t motor_raw  = adc->temp_buf[1];
-    uint16_t driver_raw = adc->temp_buf[2];
-    
-    /* 转换为温度值和母线电压 */
-    *motor_temp  = (float)motor_raw  * ADC_TEMP_PER_LSB;
-    *driver_temp = (float)driver_raw * ADC_TEMP_PER_LSB;
+    uint16_t *temp_buf = adc_sample.temp_buf;
+    *motor_temp  = _ntc_temp(temp_buf[1]);      /* 电机温度 */
+    *driver_temp = _ntc_temp(temp_buf[2]);      /* 驱动器温度 */
 }
 
-void adc_get_vbus(float *vbus)          /* 获取母线电压（V) */        
+void adc_get_vbus(int32_t *vbus)        /* 获取母线电压，Q15 标幺（1.0 = 满量程 95.70V）*/
 {
-    if (vbus)   *vbus = (float)(adc_sample.temp_buf[0]) * ADC_VBUS_PER_LSB;
+    if (vbus)   *vbus = adc_sample.temp_buf[0] << 3;    /* 12bit 0~4095 -> Q15 0~32760 */
 }
 
 void adc_set_callback(void (*callback)(void))   /* 设置用户 ADC 扫描完毕回调（高频） */
@@ -137,7 +142,7 @@ void adc_scan_cplt_callback(adc_callback_args_t *p_arg)  /* adc 扫描完毕回�
 			
 		if(!adc->calib_done){           /* 未校准完毕 */    
 			if(adc->calib_tar){         /* 调用了校准API, 手动启动校准 */
-                float *offset = adc->offset;
+                int32_t *offset = adc->offset;
 				uint16_t count = (++(adc->calib_cnt)); 
                 for(int i = 0; i < 3; i++){
                     offset[i] += curr_buf[i];

@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.20)
 
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain.cmake)
 
-project(LTM_HAL VERSION 1.0.0 LANGUAGES C ASM)
+project(LTM_HAL VERSION 1.0.2 LANGUAGES C ASM)
 
 # 版本号：命令行可用 -DLTM_HAL_VERSION=x.y.z 覆盖（script.py -v 一键生成不同版本）
 set(LTM_HAL_VERSION "${PROJECT_VERSION}" CACHE STRING "LTM_HAL 版本号")
