@@ -1,20 +1,13 @@
-# build artifacts
+# 构建产物一律不入库：build/ 与 bin/ 全部由脚本生成
 build/
 build_*/
+bin/
 __pycache__/
 *.pyc
 *.o
 *.obj
 *.map
-
-# example / app build output
-examples/*/bin/
-
-# prebuilt delivery libs: keep out of git for now (force add with: git add -f)
-LTM_CTRL/bin/**/*.a
-LTM_FOC/bin/**/*.a
-LTM_HAL/*/bin/**/*.a
-LTM_HAL/**/lib/*.a
+*.exe
 
 # editor temp files
 *.swp

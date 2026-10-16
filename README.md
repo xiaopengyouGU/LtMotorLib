@@ -29,7 +29,7 @@ LTM_HAL    底层驱动：把 MCU 外设抽象为电机所需的接口
 - **应用层用户**：`libLTM_FOC.a` + `libLTM_HAL.a` + `lt_motor.h` + `ltm_hal.h` + 链接脚本；应用层由用户自行编写。
 - **自研胶水层的内部用户**：`libLTM_CTRL.a` + 三个聚合头，配合自己的调度实现。
 - LTM_CTRL 的静态库在 LTM_FOC 构建时以对象形式并入，用户无需关心其内部模块划分。
-- 本仓库当前不跟踪预编译库（`.a`），需要时从源码构建产生。
+- 本仓库不跟踪任何构建产物（`bin/` 与 `build/`），交付物一律由各 SDK 的 `script.py` 生成。
 
 ## 目录结构
 
@@ -42,7 +42,6 @@ LTM_HAL/     平台驱动包：一个平台一份；示例（全平台共用）�
 components/  控制公共源码：FOC（control）/ 数学（math）/ 协议（protocol）
 examples/    应用层例程：basic（串口承载 LTM 协议）、canfd（CAN-FD）
 BootLoader/  IAP / UDS 在线升级：A/B 分区，升级失败可回滚
-python/      上位机辅助脚本（伯德图、SVPWM 对比等）
 ```
 
 ## 平台与板级
