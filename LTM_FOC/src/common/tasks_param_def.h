@@ -61,10 +61,6 @@
 #define SPEED_LOOP_WN                       (SPEED_LOOP_WC / 2.93790)
 #define SPEED_KP_Q15                        ((int32_t)(3.0f * SPEED_LOOP_WN / SPEED_PLANT_K * Q15_PU))
 #define SPEED_KI_Q15                        ((int32_t)(SPEED_LOOP_WN * SPEED_LOOP_WN / SPEED_PLANT_K * Q15_PU))
-/* 低速切 T 法测速的反馈切换阈值（count/s）*/
-#define SPEED_T_ON_CPS                      ((int32_t)(SPEED_T_ON_RPM / 60.0f * MOTOR_CPR))
-#define SPEED_T_OFF_CPS                     ((int32_t)(SPEED_T_OFF_RPM / 60.0f * MOTOR_CPR))
-#define SPEED_T_BLIND_CPS                   ((int32_t)(SPEED_T_BLIND_RPM / 60.0f * MOTOR_CPR))
 /* 位置环PD：ωc = 2π·8，微分零点放 2×ωc（约 27° 超前），
  * Kp = ωc/√(1+(ωc/ωz)²)、Kd = Kp/ωz。D 项吃编码器量化：1 count 抖动在 1kHz
  * 位置环下折合 Kd×0.1pu ≈ 2.7RPM 的速度给定毛刺，别再往上加了 */

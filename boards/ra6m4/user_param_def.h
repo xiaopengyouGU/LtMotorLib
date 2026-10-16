@@ -20,7 +20,6 @@
 #define SPEED_LOOP_HZ                       4000U       /* 速度环频率（Hz）：默认4kHz */
 #define POS_LOOP_HZ                         1000U       /* 位置环频率（Hz）：默认1kHz */
 #define SPEED_DIV                           5U          /* 速度环 20k/5  = 4kHz */
-#define PLL_DIV                             1U          /* 测速分频：PLL 更新率 = 电流环 / PLL_DIV */
 #define POS_DIV                             20U         /* 位置环 20k/20 = 1kHz */
 #define V_BUS_NOM_V                         24.0f       /* 整定用的设计母线 */
 /* 三环带宽 */
@@ -48,10 +47,6 @@
  * Kp = 4πζ·f_n、Ki = (2π·f_n)²/freq */
 #define PLL_KP                              2639
 #define PLL_KI                              ((uint32_t)(39.478f * 300.0f * 300.0f / CURRENT_LOOP_HZ + 0.5f))
-/* ============ 低速测速（T 法）============ */
-#define SPEED_T_ON_RPM                      40.0f       /* 低于此转速用 T 法反馈 */
-#define SPEED_T_OFF_RPM                     60.0f       /* 高于此转速切回 PLL（滞环）*/
-#define SPEED_T_BLIND_RPM                   10.0f       /* T 法输出 0 但 PLL 超过此转速：判 T 法失效，退回 PLL */
 
 /* ============ 允许的 target 范围（应用单位）============ */
 #define TARGET_TORQUE_MAX_A                 2.0f            /* 转矩模式：±2.0A（峰值）*/
@@ -74,6 +69,9 @@
 #define FRICTION_STATIC_CURR                0.18f       /* 静摩擦突破电流（A）*/
 #define FRICTION_VISCOUS                    0.00003f    /* 粘性摩擦系数（A/RPM）*/
 #define FRICTION_FF_DEADBAND                10.0f      /* 前馈死区（RPM）：低于此速不给前馈，防零速抖振 */
+
+/* ============ 齿槽补偿 ============ */
+#define COGGING_COMP_ENABLE                 0           /* 1=开 0=关：需先完成齿槽辨识并把表写进 flash */
 
 /* ============ 电机保护参数 ============ */
 #define OC_CURRENT                          11.0f       /* 过流保护触发：±11A */
