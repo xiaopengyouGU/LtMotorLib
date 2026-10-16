@@ -58,7 +58,8 @@
 /* 速度的小数位（Q16）：Ki 项最小增量 Ki·dt² ≈ 4e-5 counts/tick，需要 16 位小数才能保证精度 */
 #define     SPEED_FRAC                      16
 
-/* ====== 测速分档：档位就是窗口拍数，M 法状态机与 PLL 输出低通共用同一套区间 ====== */
+/* ====== 测速分档：档位就是窗口拍数，M 法状态机与 PLL 输出低通共用同一套区间 ======
+ * Window_Cycle_16 = 0，所以运行态清零后 M 法自动落在最长窗口（16 拍）这一档 */
 typedef enum {
     Window_Cycle_16 = 0,
     Window_Cycle_8,
@@ -116,7 +117,6 @@ typedef struct{
     int32_t         speed;              /* 自适应M法输出（counts/tick，Q16，已滤波）*/
     int32_t         speed_last;         /* 上一个滤波输出（counts/tick，Q16）*/
     uint8_t         cycle_cnt;          /* 当前窗口已过拍数 */
-    uint8_t         cycle_target;       /* 当前档位的窗口拍数 */
     lt_speed_band_t band;               /* 当前档位（带滞环）*/
 } lt_speed_adap_m_t;
 
@@ -129,14 +129,19 @@ typedef struct{
     int32_t  speed_q16;                 /* T 法输出（counts/tick，Q16）*/
 } lt_speed_period_t;
 
-/* ---- 汇总对象：常量 + 档位表 + 三种估计器状态 ---- */
+/* ---- 三种估计器的运行态：reset 一行 memset 就能整体清零 ---- */
 typedef struct{
-    uint8_t           type;             /* 本实例的测速方式 */
-    lt_speed_cfg_t    cfg;
-    lt_speed_tab_t    tab;
-    lt_speed_pll_t    pll;
+    lt_speed_pll_t    pll;              /* 锁相环 */
     lt_speed_period_t period;           /* T 法 */
     lt_speed_adap_m_t adap_m;           /* 自适应 M 法 */
+} lt_speed_runtime_t;
+
+/* ---- 汇总对象：配置（cfg/tab）+ 运行态 ---- */
+typedef struct{
+    uint8_t            type;            /* 本实例的测速方式 */
+    lt_speed_cfg_t     cfg;             /* init 按 reso/freq 预算好的标量 */
+    lt_speed_tab_t     tab;             /* init 按 reso/freq 预算好的档位表 */
+    lt_speed_runtime_t runtime;         /* 估计器运行态，与配置分开清零 */
 } lt_speed_obj;
 
 static const lt_speed_win_t win_config[Window_Count] = {
@@ -210,7 +215,7 @@ static inline int32_t _lpf_q16(int32_t x, int32_t y, uint8_t num, uint8_t shift)
 static void _m_update_band(lt_speed_obj *speed)
 {
     lt_speed_tab_t    *tab       = &speed->tab;
-    lt_speed_adap_m_t *adap_m    = &speed->adap_m;
+    lt_speed_adap_m_t *adap_m    = &speed->runtime.adap_m;
     lt_speed_band_t    curr_band = adap_m->band;
     lt_speed_band_t    new_band  = adap_m->band;    /* 默认保持本档，别写成 Window_Cycle_16 */
     int32_t            speed_abs = ABS(adap_m->speed);
@@ -222,9 +227,8 @@ static void _m_update_band(lt_speed_obj *speed)
     }
 
     if (new_band != curr_band) {
-        adap_m->band         = new_band;
-        adap_m->cycle_cnt    = 0;
-        adap_m->cycle_target = win_config[new_band].cycle;
+        adap_m->band      = new_band;       /* 窗口拍数按档位查表，不再单独存 */
+        adap_m->cycle_cnt = 0;
     }
 }
 
@@ -234,14 +238,13 @@ static void _alpha_from_ki(lt_speed_obj *speed, uint32_t ki)
 {
     lt_speed_cfg_t *cfg = &speed->cfg;
     lt_speed_tab_t *tab = &speed->tab;
-    uint32_t g_q16, sq, b;
 
     if (!cfg->freq || !ki) return;
-    g_q16 = (uint32_t)(((uint64_t)ki << ALPHA_Q16_SHIFT) / cfg->freq);   /* g = Ki/freq，Q16 */
+    uint32_t g_q16 = (uint32_t)(((uint64_t)ki << ALPHA_Q16_SHIFT) / cfg->freq);   /* g = Ki/freq，Q16 */
     if (g_q16 > ALPHA_G_Q16_MAX) g_q16 = ALPHA_G_Q16_MAX;                /* alpha 早就饱和了 */
-    sq = lt_sqrt_u32(g_q16 << ALPHA_Q16_SHIFT);                          /* sqrt(g)，Q16 */
+    uint32_t sq = lt_sqrt_u32(g_q16 << ALPHA_Q16_SHIFT);                          /* sqrt(g)，Q16 */
 
-    for (b = 0; b < Window_Count; b++) {
+    for (uint16_t b = 0; b < Window_Count; b++) {
         uint32_t best_e = 0xFFFFFFFFu;
         uint32_t want = (uint32_t)(((uint64_t)sq * win_config[b].alpha_ratio) / ALPHA_RATIO_SCALE);
         int n_best = 1, s_best = 0, n, sh;
@@ -275,7 +278,7 @@ static void _alpha_from_ki(lt_speed_obj *speed, uint32_t ki)
 static void _t_update(lt_speed_obj *speed, uint32_t pos_count)
 {
     lt_speed_cfg_t    *cfg    = &speed->cfg;
-    lt_speed_period_t *period = &speed->period;
+    lt_speed_period_t *period = &speed->runtime.period;
 
     int32_t d = (int32_t)pos_count - period->cnt_prev;
     if (d > cfg->half_reso)         d -= cfg->reso;
@@ -319,7 +322,7 @@ static void _m_update(lt_speed_obj *speed, uint32_t pos_count)
 {
     lt_speed_cfg_t    *cfg    = &speed->cfg;
     lt_speed_tab_t    *tab    = &speed->tab;
-    lt_speed_adap_m_t *adap_m = &speed->adap_m;
+    lt_speed_adap_m_t *adap_m = &speed->runtime.adap_m;
 
     int32_t reso       = cfg->reso;
     int32_t half_reso  = cfg->half_reso;
@@ -337,7 +340,7 @@ static void _m_update(lt_speed_obj *speed, uint32_t pos_count)
 
     uint8_t run_adap = 0;                               /* 本拍是否到达 M 法窗口 */
     adap_m->cycle_cnt++;
-    if (adap_m->cycle_cnt >= adap_m->cycle_target) {
+    if (adap_m->cycle_cnt >= win_config[adap_m->band].cycle) {
         adap_m->cycle_cnt = 0;
         run_adap = 1;
     }
@@ -365,7 +368,7 @@ static void _pll_update(lt_speed_obj *speed, uint32_t pos_count)
 {
     lt_speed_cfg_t *cfg = &speed->cfg;
     lt_speed_tab_t *tab = &speed->tab;
-    lt_speed_pll_t *pll = &speed->pll;
+    lt_speed_pll_t *pll = &speed->runtime.pll;
 
     int32_t reso      = cfg->reso;
     int32_t half_reso = cfg->half_reso;
@@ -426,7 +429,6 @@ uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq)
     speed->type = type;
     lt_speed_cfg_t    *cfg    = &speed->cfg;
     lt_speed_tab_t    *tab    = &speed->tab;
-    lt_speed_adap_m_t *adap_m = &speed->adap_m;
 
     cfg->reso       = (int32_t)reso;
     cfg->half_reso  = (int32_t)(reso >> 1);
@@ -453,14 +455,13 @@ uint8_t lt_speed_init(uint8_t idx, uint8_t type, uint32_t reso, uint32_t freq)
     cfg->pll_min_q16 = _drpm_to_tick_q16(PLL_MIN_SPEED_DRPM, reso, freq);
     cfg->stop_ticks  = (uint16_t)(freq / PLL_STOP_TIME_DEN);                    /* 0.25 s 对应的拍数 */
 
-    adap_m->cycle_target = win_config[Window_Cycle_16].cycle;    /* 从最长窗口（16 拍）开始 */
-    adap_m->band         = Window_Cycle_16;
+    /* 运行态已 memset 清零：adap_m.band == Window_Cycle_16，从最长窗口起步 */
     /* 占位：紧跟的 lt_speed_set 会覆盖，这里只防漏调 set 时滤波器冻住 */
     for (uint8_t b = 0; b < Window_Count; b++) {
         tab->alpha_num[b]   = 1;
         tab->alpha_shift[b] = 4;
     }
-    speed->period.n_tgt = T_N_MIN;
+    speed->runtime.period.n_tgt = T_N_MIN;
     cfg->state = LT_SPEED_ST_WAIT_SYNC;
     return 1;
 }
@@ -470,22 +471,8 @@ void lt_speed_reset(uint8_t idx)
     lt_speed_obj *speed = _speed(idx);
     if (!speed || !speed->cfg.freq)     return;
 
-    speed->pll.pos_est        = 0;
-    speed->pll.speed_est      = 0;
-    speed->pll.speed_pll      = 0;
-    speed->pll.stop_cnt       = 0;
-    speed->period.cnt_prev    = 0;
-    speed->period.acc_cnt     = 0;
-    speed->period.acc_tick    = 0;
-    speed->period.n_tgt       = T_N_MIN;
-    speed->period.speed_q16   = 0;
-    speed->adap_m.pos_last    = 0;                      /* M 法：清窗口，档位回最长窗口 */
-    speed->adap_m.speed       = 0;
-    speed->adap_m.speed_last  = 0;
-    speed->adap_m.cycle_cnt   = 0;
-    speed->adap_m.band         = Window_Cycle_16;
-    speed->adap_m.cycle_target = win_config[Window_Cycle_16].cycle;
-    speed->cfg.state          = LT_SPEED_ST_WAIT_SYNC;
+    memset(&speed->runtime, 0, sizeof(speed->runtime));     /* 三种估计器运行态一起清 */
+    speed->cfg.state = LT_SPEED_ST_WAIT_SYNC;               /* 首拍重新建基准 */
 }
 
 void lt_speed_set(uint8_t idx, uint32_t pll_kp, uint32_t pll_ki)
@@ -495,8 +482,8 @@ void lt_speed_set(uint8_t idx, uint32_t pll_kp, uint32_t pll_ki)
     if (speed->type != LT_SPEED_TYPE_PLL)           return;     /* 只有 PLL 有可整定增益 */
 
     /* Kp_dt = Kp/freq（Q16）；Ki_dt = Ki/freq（Q16）—— 与浮点版 pll_kp*dt、pll_ki*dt*dt 等价 */
-    speed->pll.kp_dt_q16 = (int32_t)(((int64_t)pll_kp << SPEED_FRAC) / speed->cfg.freq);
-    speed->pll.ki_dt_q16 = (int32_t)(((int64_t)pll_ki << SPEED_FRAC) / speed->cfg.freq);
+    speed->runtime.pll.kp_dt_q16 = (int32_t)(((int64_t)pll_kp << SPEED_FRAC) / speed->cfg.freq);
+    speed->runtime.pll.ki_dt_q16 = (int32_t)(((int64_t)pll_ki << SPEED_FRAC) / speed->cfg.freq);
     _alpha_from_ki(speed, pll_ki);                          /* 输出低通随带宽走 */
 }
 
@@ -509,24 +496,24 @@ void lt_speed_update(uint8_t idx, uint32_t pos_count)
     lt_speed_cfg_t *cfg = &speed->cfg;
 
     if (cfg->state == LT_SPEED_ST_WAIT_SYNC) {
-        speed->adap_m.pos_last = pos_count;
-        speed->pll.pos_est     = (int32_t)pos_count << cfg->pos_frac;
-        speed->period.cnt_prev = (int32_t)pos_count;
-        speed->period.n_tgt    = T_N_MIN;
+        speed->runtime.adap_m.pos_last = pos_count;
+        speed->runtime.pll.pos_est     = (int32_t)pos_count << cfg->pos_frac;
+        speed->runtime.period.cnt_prev = (int32_t)pos_count;
+        speed->runtime.period.n_tgt    = T_N_MIN;
         cfg->state             = LT_SPEED_ST_RUN;
         return;                                         /* 首拍只同步，不参与测速 */
     }
 
     switch (speed->type) {
-    case LT_SPEED_TYPE_T:
-        _t_update(speed, pos_count);
-        break;
-    case LT_SPEED_TYPE_ADAP_M:
-        _m_update(speed, pos_count);
-        break;
-    default:                                            /* PLL */
-        _pll_update(speed, pos_count);
-        break;
+        case LT_SPEED_TYPE_T:
+            _t_update(speed, pos_count);
+            break;
+        case LT_SPEED_TYPE_ADAP_M:
+            _m_update(speed, pos_count);
+            break;
+        default:                                            /* PLL */
+            _pll_update(speed, pos_count);
+            break;
     }
 }
 
@@ -537,11 +524,11 @@ int32_t lt_speed_get(uint8_t idx)
     if (!speed || speed->cfg.state != LT_SPEED_ST_RUN)      return 0;
 
     if (speed->type == LT_SPEED_TYPE_T) {
-        return (int32_t)(((int64_t)speed->period.speed_q16 * speed->cfg.freq) >> SPEED_FRAC);
+        return (int32_t)(((int64_t)speed->runtime.period.speed_q16 * speed->cfg.freq) >> SPEED_FRAC);
     }
     if (speed->type == LT_SPEED_TYPE_ADAP_M) {
-        return (int32_t)(((int64_t)speed->adap_m.speed * speed->cfg.freq) >> SPEED_FRAC);
+        return (int32_t)(((int64_t)speed->runtime.adap_m.speed * speed->cfg.freq) >> SPEED_FRAC);
     }
     /* counts/tick(Q16) -> count/s：xfreq >> 16 */
-    return (int32_t)(((int64_t)speed->pll.speed_pll * speed->cfg.freq) >> SPEED_FRAC);
+    return (int32_t)(((int64_t)speed->runtime.pll.speed_pll * speed->cfg.freq) >> SPEED_FRAC);
 }
