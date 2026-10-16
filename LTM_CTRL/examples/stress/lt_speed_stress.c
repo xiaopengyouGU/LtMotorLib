@@ -3,8 +3,7 @@
  * lt_speed 主机侧压测（PC，无硬件依赖）
  *
  * 配置：25 kHz 采样、18 位单圈编码器，与 lt_speed_init(idx, type, 262144, 25000) 对应。
- * 默认编译（LT_SPEED_USE_ADAP_M=0）只校验 PLL 通道，并检查接口约定
- * "adap_speed 恒为 0"；用 -DLT_SPEED_USE_ADAP_M=1 编译时两个通道都校验。
+ * 池里两个实例：idx 0 = PLL、idx 1 = 自适应 M 法，两个通道都参与判定。
  *
  * 运行：
  *   python script.py -t                      构建并执行本压测
@@ -60,9 +59,6 @@ static void lt_speed_get_all(int32_t *adap_speed, int32_t *pll_speed)
 #define M_FILTER_WINDOW  18.0               /* M 法最长测速窗口（拍） */
 #define M_FILTER_ALPHA   0.12               /* M 法输出滤波系数 */
 #define RAMP_SLEW        6000.0             /* 斜坡加速度 RPM/s */
-
-/* ADAP_M 关闭时，接口约定 adap_speed 恒为 0 */
-#define ADAP_ACTIVE      (LT_SPEED_USE_ADAP_M != 0)
 
 /* ==================== 确定性随机数（LCG） ==================== */
 static uint32_t rng_state = 0x12345678u;
@@ -156,11 +152,10 @@ static int channel_ok(double mean_err, double peak_err, double target)
     return (fabs(mean_err) <= mean_tol(target)) && (peak_err <= peak_tol(target));
 }
 
-/* adap 通道判据：ADAP_M 关闭时要求恒为 0，否则与 PLL 同判据 */
+/* adap 通道判据：与 PLL 同判据 */
 static int adap_ok(const result_t *r, double target)
 {
-    return ADAP_ACTIVE ? channel_ok(r->adap_mean, r->adap_peak, target)
-                       : (r->adap_max_abs == 0.0);
+    return channel_ok(r->adap_mean, r->adap_peak, target);
 }
 
 typedef double (*profile_fn)(double t, double param);
@@ -446,13 +441,12 @@ static int test_ramp(void)
     const double frac_pll  = (double)oob_pll  / n;
     const int ok_adap = (max_adap <= peak_allow) && (frac_adap <= 0.01);
     const int ok_pll  = (max_pll  <= peak_allow) && (frac_pll  <= 0.01);
-    const int ok = (ADAP_ACTIVE ? ok_adap : 1) && ok_pll && (bad == 0);
+    const int ok = ok_adap && ok_pll && (bad == 0);
 
     printf("\n== 4. 斜坡 0 -> 3000 -> -3000 -> 0（3.5 s）==\n");
     printf("M 法滤波滞后允许 = %.1f RPM（18 拍/alpha=0.12 @ 6000 RPM/s）\n", m_lag);
-    if (ADAP_ACTIVE)
-        printf("M   : 最大误差=%8.3f RPM  越带=%5.2f%%  %s\n",
-               max_adap, frac_adap * 100.0, ok_adap ? "PASS" : "FAIL");
+    printf("M   : 最大误差=%8.3f RPM  越带=%5.2f%%  %s\n",
+           max_adap, frac_adap * 100.0, ok_adap ? "PASS" : "FAIL");
     printf("PLL : 最大误差=%8.3f RPM  越带=%5.2f%%  %s\n",
            max_pll, frac_pll * 100.0, ok_pll ? "PASS" : "FAIL");
     printf("越界样本=%lld ；波形 -> trace_ramp.csv\n", (long long)bad);
@@ -526,20 +520,15 @@ static int test_steps(void)
         const double os_pll = overshoot(pll_buf, i0, i0 + (int64_t)(0.1 * SAMPLE_HZ), target);
         const int ok_pll = (st_pll >= 0.0) && (st_pll - t_step <= 0.2) && (os_pll <= os_limit);
 
-        int ok_adap = 1;
-        double st_adap = -1.0, os_adap = 0.0;
-        if (ADAP_ACTIVE) {
-            st_adap = settle_time(adap_buf, i0, i1, target, band, hold);
-            os_adap = overshoot(adap_buf, i0, i0 + (int64_t)(0.1 * SAMPLE_HZ), target);
-            ok_adap = (st_adap >= 0.0) && (st_adap - t_step <= 0.2) && (os_adap <= os_limit);
-        }
+        const double st_adap = settle_time(adap_buf, i0, i1, target, band, hold);
+        const double os_adap = overshoot(adap_buf, i0, i0 + (int64_t)(0.1 * SAMPLE_HZ), target);
+        const int ok_adap = (st_adap >= 0.0) && (st_adap - t_step <= 0.2) && (os_adap <= os_limit);
 
         printf("阶跃 %+5.0f RPM: PLL 稳定=%6.1f ms 超调=%6.1f %s", target,
                st_pll < 0 ? -1.0 : (st_pll - t_step) * 1000.0, os_pll, ok_pll ? "PASS" : "FAIL");
-        if (ADAP_ACTIVE)
-            printf(" | M 稳定=%6.1f ms 超调=%6.1f %s",
-                   st_adap < 0 ? -1.0 : (st_adap - t_step) * 1000.0, os_adap,
-                   ok_adap ? "PASS" : "FAIL");
+        printf(" | M 稳定=%6.1f ms 超调=%6.1f %s",
+               st_adap < 0 ? -1.0 : (st_adap - t_step) * 1000.0, os_adap,
+               ok_adap ? "PASS" : "FAIL");
         printf(" | %s\n", (ok_pll && ok_adap) ? "PASS" : "FAIL");
         if (ok_pll && ok_adap) pass++;
     }
@@ -856,10 +845,8 @@ int main(void)
     const int suite_count = (int)(sizeof(SUITES) / sizeof(SUITES[0]));
     int passed = 0;
 
-    printf("lt_speed 压测：采样 %.0f Hz，CPR = %u（18 位），PLL kp=%u ki=%u，"
-           "M 法通道 %s\n",
-           (double)SAMPLE_HZ, (unsigned)ENCODER_CPR, (unsigned)PLL_KP, (unsigned)PLL_KI,
-           ADAP_ACTIVE ? "开启" : "关闭（仅校验 adap 恒为 0）");
+    printf("lt_speed 压测：采样 %.0f Hz，CPR = %u（18 位），PLL kp=%u ki=%u\n",
+           (double)SAMPLE_HZ, (unsigned)ENCODER_CPR, (unsigned)PLL_KP, (unsigned)PLL_KI);
 
     for (int i = 0; i < suite_count; i++) {
         const int ok = SUITES[i].run();

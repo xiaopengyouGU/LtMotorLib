@@ -22,11 +22,10 @@ endforeach()
 add_executable(sim main.c)
 target_link_libraries(sim PRIVATE ltm_ctrl_host m)
 
-# 压测把 lt_speed 单独编进来，这样能打开 M 法通道与 PLL 对比
+# 压测把 lt_speed 单独编进来，PLL 与自适应 M 法两条通道并行对比
 add_executable(speed_stress
     stress/lt_speed_stress.c
     ${LTM_SRC}/control/speed/lt_speed.c
     ${LTM_SRC}/math/basic/lt_math.c)
 target_include_directories(speed_stress PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${LTM_SRC})
-target_compile_definitions(speed_stress PRIVATE LT_SPEED_USE_ADAP_M=1)
 target_link_libraries(speed_stress PRIVATE m)

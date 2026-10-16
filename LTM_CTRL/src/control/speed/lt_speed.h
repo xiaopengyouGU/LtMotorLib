@@ -3,24 +3,16 @@
 
 #include <stdint.h>
 
-/* 自适应 M 法开关：
- *   1 = 启用：M 法测得准，主要用于评估/对比 PLL 参数设计的效果
- *   0 = 关闭（默认）：热路径更短
- * 关闭时 ADAP_M 实例的输出恒为 0 */
-#ifndef LT_SPEED_USE_ADAP_M
-#define LT_SPEED_USE_ADAP_M             0
-#endif
-
 /* 测速实例池：无堆，idx 直接映射（与 lt_pid 同款）*/
 #ifndef LT_SPEED_MAX_INSTANCES
 #define LT_SPEED_MAX_INSTANCES          4
 #endif
 
-/* 测速方式：一个实例一种，互不干扰 */
+/* 测速方式：一个实例一种，互不干扰。三种估计器都在库里常驻，按实例类型分派 */
 typedef enum {
     LT_SPEED_TYPE_PLL      = 0,     /* 锁相环：带宽可整定，中高速主用 */
     LT_SPEED_TYPE_T        = 1,     /* T 法（周期法）：低速主用，误差只跟窗口拍数有关 */
-    LT_SPEED_TYPE_ADAP_M   = 2      /* 自适应 M 法：需打开 LT_SPEED_USE_ADAP_M */
+    LT_SPEED_TYPE_ADAP_M   = 2      /* 自适应 M 法：分档 + 滞环，窗口到点才出一次速度 */
 } lt_speed_type_t;
 
 /*------------------------- 测速接口（count/s，高频调用）---------------------------------*/

@@ -39,7 +39,7 @@ LTM_CTRL/
 | control/pid      | `lt_pid`                                                   | 增量式 PI/PD/PID，支持 Q15/Q24，静态实例池     |
 | control/pdob     | `lt_pdob`                                                  | 速度环 DOB+P、电流环无差拍 DPCC/ESO、弱磁      |
 | control/scurve   | `lt_scurve`                                                | 5 段 S 型/T 型曲线规划，静态实例池             |
-| control/speed    | `lt_speed`                                                 | 锁相环测速（count/s），可选用自适应 M 法       |
+| control/speed    | `lt_speed`                                                 | 测速实例池（count/s）：锁相环 / T 法 / 自适应 M 法 |
 | control/deadzone | `lt_deadzone`                                              | 电流极性法死区补偿                             |
 | control/filter   | `lt_notch`                                                 | 三级陷波滤波器，机械谐振抑制                   |
 | analysis/calib   | `lt_calib_R` `lt_calib_L` `lt_calib_pp` `lt_calib_encoder` | 电阻、电感、极对数与编码器方向、编码器零点校准 |
