@@ -67,6 +67,29 @@ def board_info(ltm_root, board):
     return m.group(1), (s.group(1) if s else "1000")
 
 
+def board_field(ltm_root, board, name, default=None):
+    """读 boards/<board>/board.cmake 里 set(LTM_BOARD_<name> <值> ...) 的值（去掉引号）"""
+    p = os.path.join(ltm_root, "boards", board, "board.cmake")
+    if not os.path.isfile(p):
+        sys.exit("[FAIL] 找不到板级配置 %s" % p)
+    pat = re.compile(r'set\(\s*LTM_BOARD_%s\s+([^\s)]+)' % re.escape(name))
+    m = pat.search(open(p, encoding="utf-8", errors="ignore").read())
+    if not m:
+        if default is None:
+            sys.exit("[FAIL] %s 未定义 LTM_BOARD_%s" % (p, name))
+        return default
+    return m.group(1).strip('"')
+
+
+def clean(project_dir):
+    """清理该工程的 build 目录"""
+    d = os.path.join(project_dir, "build")
+    if os.path.isdir(d):
+        shutil.rmtree(d, ignore_errors=True)
+        print("[clean] removed " + d)
+    print("[OK] 清理完成")
+
+
 def ensure_cache(build_dir, source):
     """CMakeCache 来源目录/生成器与当前工程不一致时（工程移动/复制后常见），删掉重建"""
     cache = os.path.join(build_dir, "CMakeCache.txt")
@@ -90,8 +113,8 @@ def ensure_cache(build_dir, source):
         shutil.rmtree(build_dir, ignore_errors=True)
 
 
-def build(project_dir, board, defines=None, prebuild=None):
-    """构建例程：可选先跑 prebuild（依赖的 SDK），再 cmake 配置 + 编译"""
+def build(project_dir, board, build_type="Release", defines=None, prebuild=None):
+    """构建工程：可选先跑 prebuild（依赖的 SDK），再 cmake 配置 + 编译"""
     if prebuild is not None and not prebuild(board):
         return False
     build_dir = os.path.join(project_dir, "build")
@@ -99,14 +122,15 @@ def build(project_dir, board, defines=None, prebuild=None):
     shutil.rmtree(build_dir, ignore_errors=True)   # 干净重建：换板级后不留旧缓存
     cfg = ["cmake", "-G", GENERATOR, "-B", build_dir, "-S", project_dir,
            "-DLTM_FOC_BOARD=" + board,
-           "-DCMAKE_BUILD_TYPE=Release"]
+           "-DCMAKE_BUILD_TYPE=" + build_type]
     for d in (defines or []):
         cfg.append("-D" + d)
     return run(cfg) and run(["cmake", "--build", build_dir])
 
 
-def flash(jlink, project_dir, image, device, speed):
-    """J-Link 烧录：优先 HEX（没有则 ELF），生成 Commander 脚本后执行"""
+def flash(jlink, project_dir, image, device, speed, downloads=None):
+    """J-Link 烧录：优先 HEX（没有则 ELF）后执行 Commander 脚本；
+    downloads=[(addr, bytes), ...] 在镜像之后追加写入数据块（BootLoader 用它清 App 向量表）"""
     bin_dir = os.path.join(project_dir, "bin")
     hexf = os.path.join(bin_dir, image + ".hex")
     elf  = os.path.join(bin_dir, image + ".elf")
@@ -124,22 +148,31 @@ def flash(jlink, project_dir, image, device, speed):
               "speed %s\n"
               "device %s\n"
               "connect\n"
-              'loadfile "%s"\n'
-              "r\n"
-              "g\n"
-              "qc\n") % (speed, device, os.path.abspath(img).replace("\\", "/"))
+              'loadfile "%s"\n') % (speed, device,
+                                      os.path.abspath(img).replace("\\", "/"))
+    tmp = []
+    for addr, data in (downloads or []):
+        f = os.path.join(project_dir, "download_%08X.bin" % addr)
+        with open(f, "wb") as fp:
+            fp.write(data)
+        tmp.append(f)
+        script += 'loadbin "%s", 0x%08X\n' % (f.replace("\\", "/"), addr)
+    script += "r\ng\nqc\n"
     sf = os.path.join(project_dir, "flash.jlink")
     with open(sf, "w", encoding="utf-8", newline="\n") as f:
         f.write(script)
     try:
         return run([jlink, "-CommanderScript", sf, "-ExitOnError", "1"])
     finally:
+        for f in tmp:
+            if os.path.isfile(f):
+                os.remove(f)
         if os.path.isfile(sf):
             os.remove(sf)
 
 
 def main(project_dir, ltm_root, image, default_board, description,
-         prebuild=None, defines=None):
+         prebuild=None, defines=None, build_type="Release"):
     """例程脚本统一入口：解析参数 → 清理 / 仅烧录 / 构建(/烧录)"""
     init_stdout()
     ap = argparse.ArgumentParser(description=description)
@@ -155,12 +188,8 @@ def main(project_dir, ltm_root, image, default_board, description,
                     help="SWD 时钟 kHz（默认取板级 LTM_BOARD_JLINK_SPEED）")
     args = ap.parse_args()
 
-    build_dir = os.path.join(project_dir, "build")
     if args.clean:
-        if os.path.isdir(build_dir):
-            shutil.rmtree(build_dir, ignore_errors=True)
-            print("[clean] removed " + build_dir)
-        print("[OK] 清理完成")
+        clean(project_dir)
         return
 
     device, speed = board_info(ltm_root, args.board)
@@ -179,7 +208,8 @@ def main(project_dir, ltm_root, image, default_board, description,
         print("[OK] 烧录完成")
         return
 
-    if not build(project_dir, args.board, defines=defines, prebuild=prebuild):
+    if not build(project_dir, args.board, build_type=build_type,
+                 defines=defines, prebuild=prebuild):
         sys.exit("[FAIL] 构建失败")
     if args.run:
         if not flash(jlink, project_dir, image, device, speed):

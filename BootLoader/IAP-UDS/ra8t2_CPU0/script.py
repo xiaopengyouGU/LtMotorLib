@@ -1,111 +1,52 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """统一 BootLoader 一键脚本
-- 构建 BootLoader 固件（ARM，CMake + 交叉工具链）
-- J-Link 一键烧录（R7KA8T2LF_CPU0）
-- 平台无关测试（core 层 + mock：功能 + 压测）
-- UART IAP 升级客户端（USB-TTL，LTM 协议）
+
+构建 / 烧录复用 tools/ltm_example.py；板级（工具链、HAL 包、运行区链接脚本、
+J-Link 器件名与时钟、App 起始地址）全部来自 boards/<board>/board.cmake。
 
 用法:
-  python script.py -b              # 仅构建
+  python script.py -b              # 仅构建（Release）
   python script.py -R              # 构建(Release) + 烧录
   python script.py -D              # 构建(Debug) + 烧录
-  python script.py -o              # 仅烧录现有 elf
+  python script.py -o              # 仅烧录现有镜像
   python script.py -t              # 平台无关测试（功能 + 压测）
-  python script.py -c              # 清理 build 目录
   python script.py -u --port COM3 --firmware app.bin   # UART IAP 升级
+  python script.py -c              # 清理 build 目录
 """
-import os
-import shutil
-import subprocess
 import argparse
-
-ROOT      = os.path.dirname(os.path.abspath(__file__))
-BUILD_DIR = os.path.join(ROOT, "build")
-ELF_PATH  = os.path.join(BUILD_DIR, "BootLoader.elf")
-TOOLCHAIN = os.path.join(ROOT, "cmake", "toolchain.cmake")
-TEST_DIR  = os.path.join(ROOT, "host", "test")
-DEVICE    = "R7KA8T2LF_CPU0"
-
-DEFAULT_FSP = r"D:/Develop/LtMotorLib/LTM_HAL/ltm_hal_ra8t2_CPU0"
+import os
+import subprocess
+import sys
 
 
-def run(cmd):
-    print(">>> " + " ".join(cmd))
-    return subprocess.run(cmd).returncode == 0
+def _ltm_root(start):
+    """向上找到含 boards/ 与 LTM_FOC/ 的仓库根"""
+    d = start
+    while not (os.path.isdir(os.path.join(d, "boards")) and
+               os.path.isdir(os.path.join(d, "LTM_FOC"))):
+        p = os.path.dirname(d)
+        if p == d:
+            sys.exit("[FAIL] 找不到仓库根（需含 boards/ 与 LTM_FOC/）")
+        d = p
+    return d
 
 
-def ensure_cache(dirpath, source):
-    cache = os.path.join(dirpath, "CMakeCache.txt")
-    if not os.path.isfile(cache):
-        return
-    home = None
-    with open(cache, "r", errors="ignore") as f:
-        for line in f:
-            if line.startswith("CMAKE_HOME_DIRECTORY:INTERNAL"):
-                home = line.split("=", 1)[1].strip()
-                break
-    if home and os.path.normcase(os.path.normpath(home)) != os.path.normcase(os.path.normpath(source)):
-        print(f"[warn] CMake 缓存来源不匹配: {home}")
-        shutil.rmtree(dirpath, ignore_errors=True)
+ROOT     = os.path.dirname(os.path.abspath(__file__))
+LTM_ROOT = _ltm_root(ROOT)
+sys.path.insert(0, os.path.join(LTM_ROOT, "tools"))
 
+from ltm_example import (board_field, board_info, build, clean, find_jlink,
+                         flash, init_stdout, run)
 
-def build(build_type, fsp_hal):
-    ensure_cache(BUILD_DIR, ROOT)
-    cfg = ["cmake", "-G", "MinGW Makefiles", "-B", BUILD_DIR, "-S", ROOT,
-           "-DCMAKE_BUILD_TYPE=" + build_type,
-           "-DFSP_HAL_DIR=" + fsp_hal]
-    return run(cfg) and run(["cmake", "--build", BUILD_DIR])
-
-
-def find_jlink():
-    exe = os.environ.get("JLINK_PATH")
-    if exe and os.path.isfile(exe):
-        return exe
-    exe = shutil.which("JLink.exe") or shutil.which("JLink")
-    if exe:
-        return exe
-    for p in (r"C:\Program Files\SEGGER\JLink\JLink.exe",
-              r"C:\Program Files (x86)\SEGGER\JLink\JLink.exe"):
-        if os.path.isfile(p):
-            return p
-    return None
-
-
-def flash(jlink, wipe_app=True):
-    elf = os.path.abspath(ELF_PATH).replace("\\", "/")
-    if not os.path.isfile(elf):
-        print(f"[FAIL] 找不到 {elf}，请先构建")
-        return False
-    script = (f"device {DEVICE}\n"
-              "si SWD\n"
-              "speed 1000\n"
-              "r\nh\n"
-              f"loadfile {elf}\n")
-    bad_vec = None
-    if wipe_app:
-        # 运行区起始写坏向量表（SP=0, PC=0）：
-        # BootLoader 上电判定 App 无效 → 永久驻留等待升级，不跳转
-        bad_vec = "bad_vectors.bin"
-        with open(bad_vec, "wb") as f:
-            f.write(b"\x00\x00\x00\x00" * 2)
-        script += f"loadbin {os.path.abspath(bad_vec).replace(chr(92), '/')}, 0x02008000\n"
-    script += "r\ng\nexit\n"
-    sf = "flash.jlink"
-    with open(sf, "w") as f:
-        f.write(script)
-    try:
-        return run([jlink, sf])
-    finally:
-        if bad_vec and os.path.isfile(bad_vec):
-            os.remove(bad_vec)
-        if os.path.isfile(sf):
-            os.remove(sf)
+IMAGE    = "BootLoader"
+TEST_DIR = os.path.join(ROOT, "host", "test")
 
 
 def run_tests():
+    """平台无关测试：core + mock，编译成 PC 可执行文件直接跑"""
     if not os.path.isdir(TEST_DIR):
-        print(f"[FAIL] 找不到测试目录: {TEST_DIR}")
+        print("[FAIL] 找不到测试目录: %s" % TEST_DIR)
         return False
     core = os.path.join(ROOT, "core")
     ok = True
@@ -136,47 +77,44 @@ def run_tests():
 def uart_upgrade(port, firmware, baud, app_base):
     """UART IAP 升级：调用 host/upgrade_client.py"""
     client = os.path.join(ROOT, "host", "upgrade_client.py")
-    cmd = ["python", client, "--port", port, "--firmware", firmware,
-           "--baud", str(baud), "--app-base", hex(app_base)]
-    return run(cmd)
-
-
-def clean():
-    if os.path.isdir(BUILD_DIR):
-        shutil.rmtree(BUILD_DIR, ignore_errors=True)
-        print(f"[clean] removed {BUILD_DIR}")
-    print("[OK] 清理完成")
+    return run([sys.executable, client, "--port", port, "--firmware", firmware,
+                "--baud", str(baud), "--app-base", hex(app_base)])
 
 
 def main():
+    init_stdout()
     ap = argparse.ArgumentParser(description="统一 BootLoader 构建/烧录/测试/升级")
     g = ap.add_mutually_exclusive_group()
-    g.add_argument("-b", "--build", action="store_true", help="仅构建")
+    g.add_argument("-b", "--build", action="store_true", help="仅构建（Release）")
     g.add_argument("-R", "--release-run", action="store_true", help="构建(Release) + 烧录")
     g.add_argument("-D", "--debug-run", action="store_true", help="构建(Debug) + 烧录")
-    g.add_argument("-o", "--only-flash", action="store_true", help="仅烧录现有 elf")
+    g.add_argument("-o", "--only-flash", action="store_true", help="仅烧录现有镜像")
     g.add_argument("-t", "--test", action="store_true", help="平台无关测试（功能 + 压测）")
     g.add_argument("-u", "--uart-upgrade", action="store_true", help="UART IAP 升级")
     g.add_argument("-c", "--clean", action="store_true", help="清理 build 目录")
-    ap.add_argument("--jlink", default=None, help="JLink.exe 路径")
-    ap.add_argument("--fsp-hal", default=DEFAULT_FSP, help="FSP 芯片支持源码目录")
+    ap.add_argument("--board", default="ra8t2", help="板级配置目录名（boards/<board>），默认 ra8t2")
+    ap.add_argument("--jlink", default=None, help="JLink.exe 路径（默认自动查找）")
     ap.add_argument("--keep-app", action="store_true",
-                    help="保留运行区旧 App（默认：烧 BootLoader 即擦除运行区，BootLoader 永久等待升级）")
+                    help="保留运行区旧 App（默认烧 BootLoader 时清掉运行区向量表）")
     ap.add_argument("--port", default=None, help="UART 升级串口（如 COM3）")
     ap.add_argument("--baud", type=int, default=115200, help="UART 波特率")
     ap.add_argument("--firmware", default=None, help="固件 bin 文件")
-    ap.add_argument("--app-base", type=lambda x: int(x, 0), default=0x02008000, help="App 起始地址")
+    ap.add_argument("--app-base", type=lambda x: int(x, 0), default=None,
+                    help="App 起始地址（默认取板级 LTM_BOARD_APP_ADDR）")
     args = ap.parse_args()
 
+    app_base = args.app_base or int(board_field(LTM_ROOT, args.board, 
+                                     "APP_ADDR", "0x02008000"), 0)
+
     if args.clean:
-        clean()
+        clean(ROOT)
         return
 
     if args.uart_upgrade:
         if not args.port or not args.firmware:
             ap.print_help()
             return
-        if not uart_upgrade(args.port, args.firmware, args.baud, args.app_base):
+        if not uart_upgrade(args.port, args.firmware, args.baud, app_base):
             sys.exit("[FAIL] UART 升级失败")
         print("[OK] UART 升级完成")
         return
@@ -192,26 +130,27 @@ def main():
         ap.print_help()
         return
 
-    build_type = "Release"
-    if args.debug_run:
-        build_type = "Debug"
+    build_type = "Debug" if args.debug_run else "Release"
+    device, speed = board_info(LTM_ROOT, args.board)
 
     if args.build or args.release_run or args.debug_run:
-        print(f"[1/2] 构建 BootLoader ({build_type}) ...")
-        if not build(build_type, args.fsp_hal):
+        print("[1/2] 构建 %s（%s，板级 %s）..." % (IMAGE, build_type, args.board))
+        if not build(ROOT, args.board, build_type=build_type):
             sys.exit("[FAIL] 构建失败")
-        print(f"[OK] 产物 -> {ELF_PATH}")
+        print('[OK] 产物 -> bin/%s.elf/.hex/.bin' % IMAGE)
 
     if args.release_run or args.debug_run or args.only_flash:
         jlink = args.jlink or find_jlink()
         if not jlink:
-            sys.exit("[FAIL] 找不到 JLink.exe，用 -jlink 指定或设 JLINK_PATH")
-        print(f"[2/2] 烧录 {ELF_PATH} (JLink: {jlink})"
-              + ("，擦除运行区（默认）" if not args.keep_app else "，保留运行区 App"))
-        if not flash(jlink, not args.keep_app):
+            sys.exit("[FAIL] 找不到 JLink.exe，用 --jlink 指定或设 JLINK_PATH")
+        wipe = None if args.keep_app else [(app_base, b"\x00" * 8)]
+        print("[2/2] 烧录 %s（JLink: %s）%s"
+              % (IMAGE, jlink, "，保留运行区 App" if args.keep_app
+                 else "，清掉运行区向量表（0x%08X）" % app_base))
+        if not flash(jlink, ROOT, IMAGE, device, speed, downloads=wipe):
             sys.exit("[FAIL] 烧录失败")
+        print("[OK] 完成")
 
 
 if __name__ == "__main__":
-    import sys
     main()

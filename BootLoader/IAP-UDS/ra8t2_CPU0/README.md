@@ -31,14 +31,16 @@ ra8t2_CPU0/
 │   ├── port_flash.c/h      # MRAM 擦写（FSP 支持任意长度，无需 32B 对齐）
 │   ├── port_sys.c/h        # 系统时钟/延时/跳转
 │   └── port_led.c/h        # LED（ON_OFF 常亮 / RUN 1s 心跳）
-├── app/                    # main.c + bootloader_config.h + 链接脚本
+├── app/                    # main.c + bootloader_config.h（运行区链接脚本在 boards/ra8t2/linker_boot）
 ├── bsp/                    # 精简 FSP 支持：CAN-FD + SCI9 UART + MRAM + IO + 向量表
 ├── host/
 │   ├── test/               # 平台无关测试：功能 + 压测（双通道 mock）
 │   └── upgrade_client.py   # UART IAP 升级客户端（pyserial）
-├── cmake/toolchain.cmake   # ARM 交叉编译工具链
-├── script.py               # 一键构建/烧录/测试/UART 升级
-└── build/                  # BootLoader.elf/hex/bin
+├── script.py               # 一键构建/烧录/测试/UART 升级（复用 tools/ltm_example.py）
+└── bin/                    # BootLoader.elf/hex/bin（构建产物，不入库）
+
+> 板级映射（工具链 / HAL 包 / 运行区链接脚本 / MCU 定义 / J-Link 器件名）在
+> `boards/ra8t2/board.cmake`，与 LTM_FOC、LTM_HAL 例程同一套。
 ```
 
 ## 三、分区与升级流程

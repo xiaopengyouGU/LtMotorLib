@@ -5,7 +5,11 @@ get_filename_component(LTM_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 set(LTM_FOC_BOARD        "ra8t2"                                     CACHE STRING   "板级配置")
 set(LTM_HAL_SDK_DIR      "${LTM_ROOT}/LTM_HAL/ltm_hal_ra8t2_CPU0"    CACHE PATH     "该板使用的 LTM_HAL SDK 包")
 set(LTM_BOARD_TOOLCHAIN  "${LTM_HAL_SDK_DIR}/cmake/toolchain.cmake"  CACHE FILEPATH "该板的工具链")
-set(LTM_BOARD_LINKER     "${CMAKE_CURRENT_LIST_DIR}/linker/fsp.ld"   CACHE FILEPATH "链接脚本")
+set(LTM_BOARD_LINKER     "${CMAKE_CURRENT_LIST_DIR}/linker/fsp.ld"   CACHE FILEPATH "App 链接脚本")
+# BootLoader 运行区（0x02000000，32KB）链接脚本：memory_regions.ld 与 App 版不同，
+# fsp_gen.ld 两个布局共用（靠 -L 搜索路径从 linker/ 取）
+set(LTM_BOARD_BOOT_LINKER "${CMAKE_CURRENT_LIST_DIR}/linker_boot/fsp.ld" CACHE FILEPATH "BootLoader 链接脚本")
+set(LTM_BOARD_APP_ADDR   0x02008000                                  CACHE STRING   "App 运行区起始地址（BootLoader 烧录时清向量表用）")
 set(LTM_BOARD_DEFINES  _RENESAS_RA_ _RA_CORE=CPU0 _RA_ORDINAL=1      CACHE STRING   "该板的 MCU 编译定义")
 set(LTM_BOARD_JLINK_DEVICE "R7KA8T2LF_CPU0"                          CACHE STRING   "J-Link device (flash)")
 set(LTM_BOARD_JLINK_SPEED  1000                                      CACHE STRING   "J-Link SWD 时钟 (kHz)")
