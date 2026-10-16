@@ -30,6 +30,7 @@ include_directories(
 
 set(EXAMPLE_SOURCES
     src/main.c
+    ${LTM_ROOT}/components/math/basic/lt_str.c
     ${LTM_ROOT}/components/protocol/ltm_commut.c
     ${LTM_ROOT}/components/protocol/protocol.c
 )

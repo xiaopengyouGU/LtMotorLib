@@ -21,6 +21,7 @@
 #include "protocol/ltm_commut.h"
 #include "control/foc/lt_foc.h"
 #include "math/basic/lt_math.h"
+#include "math/basic/lt_str.h"
 
 /* ---- 机型参数：板级可覆盖（boards/<board>/board.cmake 的 LTM_BOARD_EXAMPLE_DEFINES）---- */
 #ifndef POLE_PAIRS

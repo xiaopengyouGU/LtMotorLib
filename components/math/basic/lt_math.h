@@ -2,7 +2,6 @@
 #define LT_MATH_H
 
 #include <stdint.h>
-#include <stdio.h>
 /*---------------------- 浮点数学函数 ----------------------*/
 
 float lt_sin(float the);                /* 浮点正弦（查表 + 线性插值，输入 0~2π） */
@@ -33,21 +32,6 @@ float lt_normalize_quick(float value, float range);     /* 快速归一化，[0,
 #define _2_DIV_3					0.6666667f
 #define _PI_3_INV					0.9549297f		/* 1/(pi/3)*/
 #define _2_PI_INV  					0.1591549f		/* 1/(2*pi) */
-
-/*---------------------- 简易浮点转字符串 ----------------------*/
-/* 仅用整数格式化（%ld），不依赖标准库浮点 printf，
-   链接时无需 -u _printf_float，可省数 KB 代码。固定 3 位小数。 */
-#define LT_FTOAT3(buf, val)                                         \
-    do {                                                            \
-        float _v = (val);                                           \
-        long  _ip = (long)_v;                                       \
-        long  _fp = (long)(((_v < 0.0f ? -_v : _v) - (_ip < 0 ? -_ip : _ip)) \
-                           * 1000.0f + 0.5f);                       \
-        if (_fp >= 1000) { _fp = 0; _ip += (_v < 0 ? -1 : 1); }     \
-        if (_ip < 0) sprintf((buf), "-%ld.%03ld", -_ip, _fp);       \
-        else         sprintf((buf), "%ld.%03ld", _ip, _fp);         \
-    } while (0)
-
 
 /* 内联优化，加快执行速度 */
 static inline float lt_normalize(float angle)		/* 角度归一化[0, 2π)，快速操作 */

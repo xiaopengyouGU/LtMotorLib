@@ -42,6 +42,7 @@ set(EXAMPLE_SOURCES
     ${LTM_COMPONENTS}/protocol/protocol.c
     ${LTM_COMPONENTS}/control/foc/lt_foc.c
     ${LTM_COMPONENTS}/math/basic/lt_math.c
+    ${LTM_COMPONENTS}/math/basic/lt_str.c
 )
 
 add_executable(${PROJECT_NAME}.elf ${EXAMPLE_SOURCES})

@@ -1,7 +1,7 @@
 /*
  * LTM_FOC 胶水层 + LTM_CTRL 开环示例（串口承载 LTM 协议）
- * - 底层：LTM_HAL 静态库（lib/libLTM_HAL.a + lib/ltm_hal/ltm_hal.h）
- * - 控制：LTM_FOC 胶水层（lib/libLTM_FOC.a，已内含 LTM_CTRL 算法）
+ * - 底层：LTM_HAL 静态库（板级 boards/<board>/board.cmake 指定的 HAL 包）
+ * - 控制：LTM_FOC 胶水层（LTM_FOC/bin/libLTM_FOC.a，已内含 LTM_CTRL 算法）
  *         lt_motor_init() 一键完成：HAL 初始化 + 电流零点校准 + 上电预定位
  *         + 状态机 + 20kHz 三环回调绑定
  * - 通讯：LTM 协议（ltm_commut，经串口 UART0 承载）
@@ -16,7 +16,7 @@
 #include "ltm_hal/ltm_hal.h"
 #include "ltm_foc/lt_motor.h"
 #include "protocol/ltm_commut.h"
-#include "util/user_common.h"
+#include "math/basic/lt_str.h"
 
 void user_func(uint8_t data_type, uint8_t *buf, uint16_t len);
 
@@ -168,10 +168,10 @@ static void user_help(void)
 /* 模式切换辅助：解析参数 → 交给 lt_motor_set 判范围 → 按返回码回显 */
 static void user_set_mode(uint8_t *buf, uint16_t len, uint8_t mode, const char *name)
 {
-    float val    = user_parse_float(buf + 2, (uint16_t)(len - 2));
+    float val    = lt_atof(buf + 2, (uint16_t)(len - 2));
     lt_err_t err = lt_motor_set((lt_motor_mode_t)mode, val);
     char tmpBuf[16];
-    user_float3(val, tmpBuf);
+    lt_ftoa3(val, tmpBuf);
     if (err != LT_OK) {
         ltm_commut_printf("%s target %s rejected: %s\r\n", name, tmpBuf, err_name((int)err));
     } else {
@@ -212,10 +212,11 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
         {
             float value;
             memcpy(&value, buf, sizeof(value));
-            value = USER_CONSTRAINS(value, 100.0f, -100.0f);
+            if (value >  100.0f) value =  100.0f;
+            if (value < -100.0f) value = -100.0f;
             lt_motor_set(Mode_Open_Loop, value);
             char vqBuf[16];
-            user_float3(value, vqBuf);
+            lt_ftoa3(value, vqBuf);
             ltm_commut_printf("OpenLoop Vq : %s %%\n", vqBuf);
             break;
         }

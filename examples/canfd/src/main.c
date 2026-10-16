@@ -1,7 +1,7 @@
 /*
  * LTM_FOC 胶水层 + LTM_CTRL 开环示例（CAN-FD 承载 LTM 协议）
- * - 底层：LTM_HAL 静态库（lib/libLTM_HAL.a + lib/ltm_hal/ltm_hal.h）
- * - 控制：LTM_FOC 胶水层（lib/libLTM_FOC.a，已内含 LTM_CTRL 算法）
+ * - 底层：LTM_HAL 静态库（板级 boards/<board>/board.cmake 指定的 HAL 包）
+ * - 控制：LTM_FOC 胶水层（LTM_FOC/bin/libLTM_FOC.a，已内含 LTM_CTRL 算法）
  *         lt_motor_init() 一键完成：HAL 初始化 + 电流零点校准 + 状态机 + 25kHz 三环回调绑定
  * - 通讯：LTM 协议（ltm_commut，经 CAN-FD 0x100 承载，串口仅保留接收）
  * - 开环：Data_Target 下发 Vq 占空比(%)，SVPWM 调制
@@ -14,7 +14,7 @@
 #include "ltm_hal/ltm_hal.h"
 #include "ltm_foc/lt_motor.h"
 #include "protocol/ltm_commut.h"
-#include "util/lt_str.h"
+#include "math/basic/lt_str.h"
 
 /* CAN-FD 升级触发 ID：与 BootLoader 一致，上位机发 0x7F0 帧 -> App 软复位进 BootLoader */
 #define APP_UPGRADE_TRIGGER_ID  0x7F0
@@ -66,9 +66,9 @@ int main(void)
         ltm_delay_ms(2);
     }
     char fbuf[3][16];
-    LT_FTOAT3(fbuf[0], (float)sIa / 500.0f / 32767.0f * LTM_ADC_FULL_SCALE_CURRENT_A);
-    LT_FTOAT3(fbuf[1], (float)sIb / 500.0f / 32767.0f * LTM_ADC_FULL_SCALE_CURRENT_A);
-    LT_FTOAT3(fbuf[2], (float)sIc / 500.0f / 32767.0f * LTM_ADC_FULL_SCALE_CURRENT_A);
+    LT_FTOAT3(fbuf[0], (float)sIa / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
+    LT_FTOAT3(fbuf[1], (float)sIb / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
+    LT_FTOAT3(fbuf[2], (float)sIc / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
     ltm_commut_printf("standstill mean A: %s A\r\n", fbuf[0]);
     ltm_commut_printf("standstill mean B: %s A\r\n", fbuf[1]);
     ltm_commut_printf("standstill mean C: %s A\r\n", fbuf[2]);
