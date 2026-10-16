@@ -6,10 +6,10 @@
 cmake_minimum_required(VERSION 3.20)
 
 get_filename_component(LTM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
-if(NOT LTM_FOC_BOARD)
-    set(LTM_FOC_BOARD "ra6m4")
+if(NOT LTM_BOARD)
+    set(LTM_BOARD "ra6m4")
 endif()
-include(${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake)
+include(${LTM_ROOT}/boards/${LTM_BOARD}/board.cmake)
 get_filename_component(LTM_BOARD_LINKER_DIR "${LTM_BOARD_LINKER}" DIRECTORY)
 
 set(CMAKE_TOOLCHAIN_FILE ${LTM_BOARD_TOOLCHAIN})

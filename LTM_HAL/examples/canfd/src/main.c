@@ -28,6 +28,7 @@
 #define POLE_PAIRS           7             /* 极对数（板级未给定时用此默认值）*/
 #endif
 #define Q15_MAX              32767         /* Q15 能表示的最大值 */
+#define ZERO_FIND_DUTY_Q15   1638          /* 预定位 D 轴电压 0.05 pu（Q15）*/
 #ifndef ENCODER_ZERO_OFFSET
 #define ENCODER_ZERO_OFFSET  0.0f          /* 电角度零点 count；0 = 上电预定位实测 */
 #endif
@@ -96,8 +97,9 @@ int main(void)
     ltm_commut_printf("standstill mean B: %s A\r\n", fbuf[1]);
     ltm_commut_printf("standstill mean C: %s A\r\n", fbuf[2]);
 
-    /* 开环 FOC：SVPWM 调制 */
-    lt_foc_init(FOC_TYPE_SVPWM);
+    /* 开环 FOC：定点 SVPWM（components/control/foc）*/
+    lt_foc_init();
+    lt_foc_set(LTM_ENC_CPR);           /* 电角度单圈分辨率 = 编码器单圈计数 */
 
     ltm_curves curves;
     uint8_t data_type, data[128];
@@ -109,18 +111,20 @@ int main(void)
     }
     ltm_commut_printf("Hello Lvtou!!! \n");
     /* 电角度零点：板级给了固定值就直接用（绝对值编码器），否则上电预定位实测一次 */
-    float zero_count;
+    int32_t zero_count;                  /* 电角度零点（编码器单圈计数）*/
     if (ENCODER_ZERO_OFFSET > 0.0f) {
-        zero_count = ENCODER_ZERO_OFFSET;
+        zero_count = (int32_t)ENCODER_ZERO_OFFSET;
     } else {
-        ltm_pwm_set_dutys(0.05f * Q15_MAX, 0, 0);       /* D 轴强拖到 0 电角度 */
+        int32_t dutys[3];
+        lt_foc_update(ZERO_FIND_DUTY_Q15, 0, 0, dutys);  /* D 轴强拖到 0 电角度 */
+        ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
         ltm_delay_ms(200);
         ltm_enc_update();
-        zero_count = (float)ltm_enc_get_count();
+        zero_count = (int32_t)ltm_enc_get_count();
         ltm_pwm_set_dutys(0, 0, 0);
         ltm_delay_ms(50);
     }
-    ltm_commut_printf("zero offset = %d\r\n", (int)zero_count);
+    ltm_commut_printf("zero offset = %d\r\n", zero_count);
 
     while(1)
     {
@@ -129,15 +133,12 @@ int main(void)
             user_func(data_type, data, data_len);
         }
         ltm_enc_update();           /* 定时更新编码器 */
-        float enc = (float)ltm_enc_get_count();
-        float the = (enc - zero_count) * LTM_ENC_RAD_PER_COUNT * POLE_PAIRS;
-        the = lt_normalize(the);
-        /* 开环控制：编码器电角度 → SVPWM → 三相占空比 */
+        /* 开环控制：编码器电角度 → 定点 SVPWM → 三相占空比 */
+        uint32_t the = (uint32_t)(((int32_t)ltm_enc_get_count() - zero_count) * POLE_PAIRS);
         if(run_flag){
-            lt_foc_process(0.0f, vq_target * 0.01f, the);
-            float dA, dB, dC;
-            lt_foc_get_dutys(&dA, &dB, &dC);
-            ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
+            int32_t dutys[3];
+            lt_foc_update(0, (int32_t)(vq_target * 0.01f * Q15_MAX), the, dutys);
+            ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
             ltm_led_set(LTM_LED_STOP, 0);
             ltm_led_set(LTM_LED_RUN, 1);
         }else{
@@ -155,28 +156,23 @@ int main(void)
         ltm_adc_get_current(&rawIa, &rawIb, &rawIc);
         ltm_adc_get_vbus(&rawVbus);
         ltm_adc_get_temp(&rawMotor, &rawDriver);
-        float Ia = rawIa * LTM_ADC_CURRENT_PER_COUNT;
-        float Ib = rawIb * LTM_ADC_CURRENT_PER_COUNT;
-        float Ic = rawIc * LTM_ADC_CURRENT_PER_COUNT;
-        float vbus = rawVbus * LTM_ADC_VOLTAGE_PER_COUNT;
-        float driver_temp = rawDriver * LTM_ADC_TEMP_PER_COUNT;
-        float Ialpha = Ia;
-        float Ibeta  = _SQRT_3_3 * (Ib - Ic);
-        float _c = lt_cos(the);
-        float _s = lt_sin(the);
-        float Id =  _c * Ialpha + _s * Ibeta;
-        float Iq = -_s * Ialpha + _c * Ibeta;
+        /* D/Q 电流用定点 Clarke+Park（与 lt_foc_update 共用同一 foc->step 口径）*/
+        int32_t f3[3] = { rawIa, rawIb, rawIc };
+        int32_t Id_q15, Iq_q15;
+        int32_t fa = ((2 * rawIa - rawIb - rawIc) * 10923) >> 15;   /* α 轴（Q15）*/
+        int32_t fb = ((rawIb - rawIc) * 18919) >> 15;               /* β 轴（Q15）*/
+        lt_foc_clark_park(f3, the, &Id_q15, &Iq_q15);
         curves.size = 10;
-        curves.values[0] = Ia;
-        curves.values[1] = Ib;
-        curves.values[2] = Ic;
-        curves.values[3] = Ialpha;
-        curves.values[4] = Ibeta;
-        curves.values[5] = vbus;
+        curves.values[0] = rawIa * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[1] = rawIb * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[2] = rawIc * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[3] = fa * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[4] = fb * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[5] = rawVbus * LTM_ADC_VOLTAGE_PER_COUNT;
         curves.values[6] = (float)ltm_enc_get_position() * (360.0f / LTM_ENC_CPR);
-        curves.values[7] = Id;
-        curves.values[8] = Iq;
-        curves.values[9] = driver_temp;
+        curves.values[7] = Id_q15 * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[8] = Iq_q15 * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[9] = rawDriver * LTM_ADC_TEMP_PER_COUNT;
         ltm_commut_send_curves(&curves);
 
         ltm_delay_us(900);

@@ -121,7 +121,7 @@ def build(project_dir, board, build_type="Release", defines=None, prebuild=None)
     ensure_cache(build_dir, project_dir)
     shutil.rmtree(build_dir, ignore_errors=True)   # 干净重建：换板级后不留旧缓存
     cfg = ["cmake", "-G", GENERATOR, "-B", build_dir, "-S", project_dir,
-           "-DLTM_FOC_BOARD=" + board,
+           "-DLTM_BOARD=" + board,
            "-DCMAKE_BUILD_TYPE=" + build_type]
     for d in (defines or []):
         cfg.append("-D" + d)

@@ -2,9 +2,9 @@
 #define TASKS_PARAM_DEF_H
 
 /* 板级/机型参数：构建时用 -DLTM_FOC_PARAM_H=<路径> 指定
- * 走 CMake 时等价于 -DLTM_FOC_BOARD=<board>，即 boards/<board>/user_param_def.h */
+ * 走 CMake 时等价于 -DLTM_BOARD=<board>，即 boards/<board>/user_param_def.h */
 #ifndef LTM_FOC_PARAM_H
-#error "LTM_FOC: 未指定参数文件，请用 -DLTM_FOC_PARAM_H=<boards/<board>/user_param_def.h> 或 CMake 变量 LTM_FOC_BOARD"
+#error "LTM_FOC: 未指定参数文件，请用 -DLTM_FOC_PARAM_H=<boards/<board>/user_param_def.h> 或 CMake 变量 LTM_BOARD"
 #endif
 #include LTM_FOC_PARAM_H
 

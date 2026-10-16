@@ -28,6 +28,7 @@
 #define POLE_PAIRS           5             /* 极对数（板级未给定时用此默认值）*/
 #endif
 #define Q15_MAX              32767         /* Q15 能表示的最大值 */
+#define ZERO_FIND_DUTY_Q15   3277          /* 预定位 D 轴电压 0.1 pu（Q15）*/
 #ifndef ENCODER_ZERO_OFFSET
 #define ENCODER_ZERO_OFFSET  0.0f          /* 电角度零点 count；0 = 上电预定位实测 */
 #endif
@@ -66,8 +67,9 @@ int main(void)
     ltm_adc_calibrate_zero(2500);        /* 2500 次扫描平均 */
     ltm_delay_ms(500);                   /* 等校准完成 */
     ltm_commut_printf("ADC calib done! \r\n");
-    /* 开环 FOC：SVPWM 调制 */
-    lt_foc_init(FOC_TYPE_SVPWM);
+    /* 开环 FOC：定点 SVPWM（components/control/foc）*/
+    lt_foc_init();
+    lt_foc_set(LTM_ENC_CPR);           /* 电角度单圈分辨率 = 编码器单圈计数 */
 
     ltm_curves curves;
     uint8_t data_type, data[128];
@@ -79,21 +81,20 @@ int main(void)
     }
     ltm_commut_printf("Hello Lvtou!!! \n");
     /* 电角度零点：板级给了固定值就直接用（绝对值编码器），否则上电预定位实测一次 */
-    float zero_count;
+    int32_t zero_count;                  /* 电角度零点（编码器单圈计数）*/
     if (ENCODER_ZERO_OFFSET > 0.0f) {
-        zero_count = ENCODER_ZERO_OFFSET;
+        zero_count = (int32_t)ENCODER_ZERO_OFFSET;
     } else {
-        lt_foc_process(0.1f, 0, 0);                     /* D 轴强拖到 0 电角度 */
-        float dA, dB, dC;
-        lt_foc_get_dutys(&dA, &dB, &dC);
-        ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
+        int32_t dutys[3];
+        lt_foc_update(ZERO_FIND_DUTY_Q15, 0, 0, dutys);  /* D 轴强拖到 0 电角度 */
+        ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
         ltm_delay_ms(250);
         ltm_enc_update();               /* 更新编码器计数值 */
-        zero_count = (float)ltm_enc_get_count();
+        zero_count = (int32_t)ltm_enc_get_count();
         ltm_pwm_set_dutys(0, 0, 0);
         ltm_delay_ms(50);
     }
-    ltm_commut_printf("zero offset = %d\r\n", (int)zero_count);
+    ltm_commut_printf("zero offset = %d\r\n", zero_count);
 
     while(1)
     {
@@ -104,13 +105,12 @@ int main(void)
         ltm_enc_update();           /* 定时更新编码器 */
          /* 开环控制：编码器电角度 → SVPWM → 三相占空比 */
         if (run_flag) {
-            float enc = (float)ltm_enc_get_count();
-            float the = (enc - zero_count) * LTM_ENC_RAD_PER_COUNT * POLE_PAIRS;
-            the = lt_normalize(the);
-            lt_foc_process(0.0f, vq_target * 0.01f, the);
-            float dA, dB, dC;
-            lt_foc_get_dutys(&dA, &dB, &dC);
-            ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
+            int32_t  dutys[3];
+            /* 电角度计数 the =（单圈计数 − 零点）× 极对数，与 lt_foc_update 同口径 */
+            uint32_t the = (uint32_t)(((int32_t)ltm_enc_get_count() - zero_count) * POLE_PAIRS);
+            int32_t  vq  = (int32_t)(vq_target * 0.01f * Q15_MAX);
+            lt_foc_update(0, vq, the, dutys);
+            ltm_pwm_set_dutys(dutys[0], dutys[1], dutys[2]);
             ltm_led_set(LTM_LED_STOP, 0);
             ltm_led_set(LTM_LED_RUN, 1);
         } else {

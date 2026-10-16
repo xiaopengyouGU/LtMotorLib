@@ -1,307 +1,287 @@
 /*
- * SPDX-License-Identifier: MIT
  * Change Logs:
  * Date           Author        Notes
- * 2025-6-21      Lvtou         The first version
- * 2025-8-27      Lvtou         Use lookup table sin and cos
- * 2025-9-7       Lvtou         Fix 6 commutation method and add modulation modes
- * 2025-11-30     Lvtou         Reimplement foc object and remove six-step commutation
- * 2026-6-25      Lvtou         整合六步换向及HALL，修改API接口，添加真正的 SVPWM实现 
- * 2026-8-12      Lvtou			简化 FOC 模块的实现，API接口更简单
+ * 2026-9-24      Lvtou         纯定点 SVPWM 运算
+ * 2026-9-24      Lvtou         内置 512 点全周期正弦表，去掉 lt_q15_sin_cos 调用
  */
 
 #include "control/foc/lt_foc.h"
 #include "math/basic/lt_math.h"
-#include <stdlib.h>
 #include <string.h>
-#include <math.h>
-
-/* 六步换相表：1:正向导通，-1：反向导通，0：不导通 */
-static int8_t trapz_6_table[6][3] = {   {0,1,-1},	/* 扇区1 */
-										{-1,1,0},	/* 扇区2 */
-										{-1,0,1},	/* 扇区3 */
-										{0,-1,1},	/* 扇区4 */
-										{1,-1,0},	/* 扇区5 */
-										{1,0,-1}	/* 扇区6 */
-};
-
-/* 霍尔信号映射表，表中的值 - 1（0除外），恰好对应 trapz_6_table的主索引
- * 信号格式 : ABC ==》 bit2 : A, bit1 ：B, bit0 ：C
- * eg: 101（5） --> 扇区 1, 000 or 111 --> 错误信号
- * 注：此处按理说不应该出现 HALL的，但恰好 HALL 和 六步换向能整合到 lt_foc 框架下
- *     因此没有必要搞一个 lt_trapz.c, 读者往下看就能体会到这一点
- */
-
-static uint8_t hall_map[8] = {  0,		/* 错误信号 */
-								6,		/* 扇区 6 */
-								4,		/* 扇区 4 */
-								5,		/* 扇区 5 */
-								2,		/* 扇区 2 */
-								1,		/* 扇区 1 */
-								3,		/* 扇区 3 */
-								0		/* 错误信号 */
-};
-
 
 /*---------------------- FOC 对象定义 ----------------------*/
 typedef struct {
-    uint8_t type;                 /* 调制类型 */
-	/* 输出占空比 [0,1] */
-    float dutyA;
- 	float dutyB;
-	float dutyC;    			  /* 浮点数版本 */
+    uint32_t reso;                /* 电角度单圈分辨率：一个电周期对应的 the 增量 */
+    uint32_t step;                /* 预计算相位增量（Q16.16，每个计数），热路径只乘法 */
 }lt_foc_object;
 
 static lt_foc_object foc_obj;
+static lt_foc_object *foc = &foc_obj;
+
+/* 512 点全周期正弦表（Q15，32768 == 1.0）：i × 2π/512
+ * 幅值限制在 ±32767（不取 -32768）：避免与 -1.0 相乘时的 int16 溢出
+ * 多留一项 tab[512] = tab[0]，索引 i+1 不必取模 */
+static const int16_t sine_table_512[513] = {
+         0,    402,    804,   1206,   1608,   2009,   2411,   2811,   3212,   3612,   4011,   4410,   4808,   5205,   5602,   5998,
+      6393,   6787,   7180,   7571,   7962,   8351,   8740,   9127,   9512,   9896,  10279,  10660,  11039,  11417,  11793,  12167,
+     12540,  12910,  13279,  13646,  14010,  14373,  14733,  15091,  15447,  15800,  16151,  16500,  16846,  17190,  17531,  17869,
+     18205,  18538,  18868,  19195,  19520,  19841,  20160,  20475,  20788,  21097,  21403,  21706,  22006,  22302,  22595,  22884,
+     23170,  23453,  23732,  24008,  24279,  24548,  24812,  25073,  25330,  25583,  25833,  26078,  26320,  26557,  26791,  27020,
+     27246,  27467,  27684,  27897,  28106,  28311,  28511,  28707,  28899,  29086,  29269,  29448,  29622,  29792,  29957,  30118,
+     30274,  30425,  30572,  30715,  30853,  30986,  31114,  31238,  31357,  31471,  31581,  31686,  31786,  31881,  31972,  32058,
+     32138,  32214,  32286,  32352,  32413,  32470,  32522,  32568,  32610,  32647,  32679,  32706,  32729,  32746,  32758,  32766,
+     32767,  32766,  32758,  32746,  32729,  32706,  32679,  32647,  32610,  32568,  32522,  32470,  32413,  32352,  32286,  32214,
+     32138,  32058,  31972,  31881,  31786,  31686,  31581,  31471,  31357,  31238,  31114,  30986,  30853,  30715,  30572,  30425,
+     30274,  30118,  29957,  29792,  29622,  29448,  29269,  29086,  28899,  28707,  28511,  28311,  28106,  27897,  27684,  27467,
+     27246,  27020,  26791,  26557,  26320,  26078,  25833,  25583,  25330,  25073,  24812,  24548,  24279,  24008,  23732,  23453,
+     23170,  22884,  22595,  22302,  22006,  21706,  21403,  21097,  20788,  20475,  20160,  19841,  19520,  19195,  18868,  18538,
+     18205,  17869,  17531,  17190,  16846,  16500,  16151,  15800,  15447,  15091,  14733,  14373,  14010,  13646,  13279,  12910,
+     12540,  12167,  11793,  11417,  11039,  10660,  10279,   9896,   9512,   9127,   8740,   8351,   7962,   7571,   7180,   6787,
+      6393,   5998,   5602,   5205,   4808,   4410,   4011,   3612,   3212,   2811,   2411,   2009,   1608,   1206,    804,    402,
+         0,   -402,   -804,  -1206,  -1608,  -2009,  -2411,  -2811,  -3212,  -3612,  -4011,  -4410,  -4808,  -5205,  -5602,  -5998,
+     -6393,  -6787,  -7180,  -7571,  -7962,  -8351,  -8740,  -9127,  -9512,  -9896, -10279, -10660, -11039, -11417, -11793, -12167,
+    -12540, -12910, -13279, -13646, -14010, -14373, -14733, -15091, -15447, -15800, -16151, -16500, -16846, -17190, -17531, -17869,
+    -18205, -18538, -18868, -19195, -19520, -19841, -20160, -20475, -20788, -21097, -21403, -21706, -22006, -22302, -22595, -22884,
+    -23170, -23453, -23732, -24008, -24279, -24548, -24812, -25073, -25330, -25583, -25833, -26078, -26320, -26557, -26791, -27020,
+    -27246, -27467, -27684, -27897, -28106, -28311, -28511, -28707, -28899, -29086, -29269, -29448, -29622, -29792, -29957, -30118,
+    -30274, -30425, -30572, -30715, -30853, -30986, -31114, -31238, -31357, -31471, -31581, -31686, -31786, -31881, -31972, -32058,
+    -32138, -32214, -32286, -32352, -32413, -32470, -32522, -32568, -32610, -32647, -32679, -32706, -32729, -32746, -32758, -32766,
+    -32767, -32766, -32758, -32746, -32729, -32706, -32679, -32647, -32610, -32568, -32522, -32470, -32413, -32352, -32286, -32214,
+    -32138, -32058, -31972, -31881, -31786, -31686, -31581, -31471, -31357, -31238, -31114, -30986, -30853, -30715, -30572, -30425,
+    -30274, -30118, -29957, -29792, -29622, -29448, -29269, -29086, -28899, -28707, -28511, -28311, -28106, -27897, -27684, -27467,
+    -27246, -27020, -26791, -26557, -26320, -26078, -25833, -25583, -25330, -25073, -24812, -24548, -24279, -24008, -23732, -23453,
+    -23170, -22884, -22595, -22302, -22006, -21706, -21403, -21097, -20788, -20475, -20160, -19841, -19520, -19195, -18868, -18538,
+    -18205, -17869, -17531, -17190, -16846, -16500, -16151, -15800, -15447, -15091, -14733, -14373, -14010, -13646, -13279, -12910,
+    -12540, -12167, -11793, -11417, -11039, -10660, -10279,  -9896,  -9512,  -9127,  -8740,  -8351,  -7962,  -7571,  -7180,  -6787,
+     -6393,  -5998,  -5602,  -5205,  -4808,  -4410,  -4011,  -3612,  -3212,  -2811,  -2411,  -2009,  -1608,  -1206,   -804,   -402,
+         0,
+};
+
+/*---------------------- Q15 正余弦查表 ----------------------*/
+/* 512 点全周期表 + 7 位线性插值：phase 为 16 位相位（65536 == 2π）
+ * cos 用 sin 索引 + 128（90°）；无象限折叠、无取模、无函数调用 */
+static inline void foc_sin_cos(uint16_t phase, int16_t *s, int16_t *c)
+{
+    uint16_t is   = (uint16_t)(phase >> 7);                  /* 0~511 */
+    int32_t  frac = (int32_t)(phase & 0x7f);                 /* 0~127 */
+    int32_t  t1 = sine_table_512[is];
+    int32_t  t2 = sine_table_512[is + 1];                    /* tab[512] == tab[0]，免取模 */
+    *s = (int16_t)(t1 + (((t2 - t1) * frac) >> 7));
+    is = (uint16_t)((is + 128u) & 511u);                     /* cos 索引 = sin 索引 + 90° */
+    t1 = sine_table_512[is];
+    t2 = sine_table_512[is + 1];
+    *c = (int16_t)(t1 + (((t2 - t1) * frac) >> 7));
+}
+
+/*---------------------- Q15 定点 SVPWM 辅助 ----------------------*/
+/* 定点标度：32768 == 1.0（Q15）
+ * FOC_Q15_SQRT3_2_I32 = √3/2 × 32768；FOC_Q15_HALF_I32 = 0.5 × 32768 */
+#define FOC_Q15_SQRT3_2_I32     28378
+#define FOC_Q15_HALF_I32        16384
+#define FOC_Q15_ONE_I32         32768
+#define FOC_Q15_VMAX_I32        46340      /* 圆的外接方框：46340^2*2 < 2^32 */
+#define FOC_Q15_MAX_I32         32767      /* Q15 能表示的上限（正弦表幅值）*/
+/* 过调制 + 零矢量时间（Q15 版，32768 == 1.0）：T1+T2 > 1.0 时等比例缩小，并计算 T0/2 */
+#define SVPWM_SCALE_T0_Q15(T1, T2, T0_half)                                       \
+    do {                                                                          \
+        int32_t _t_sum = (T1) + (T2);                                             \
+        if (_t_sum > FOC_Q15_ONE_I32) {                                           \
+            int32_t _t_inv = (int32_t)(((int32_t)FOC_Q15_ONE_I32 * FOC_Q15_ONE_I32) / _t_sum); \
+            (T1) = (int32_t)(((int32_t)(T1) * _t_inv) >> 15);                     \
+            (T2) = (int32_t)(((int32_t)(T2) * _t_inv) >> 15);                     \
+            _t_sum = (T1) + (T2);                                                 \
+        }                                                                         \
+        (T0_half) = (FOC_Q15_ONE_I32 - _t_sum) >> 1;                              \
+    } while (0)
 
 /*---------------------- API 实现 ----------------------*/
-void lt_foc_init(uint8_t type)
+/*==============================================================================
+ * 初始化 FOC 对象（清零）：调用顺序 init -> set -> update
+ *==============================================================================*/
+void lt_foc_init(void)
 {
-    memset(&foc_obj, 0, sizeof(lt_foc_object));   
-    if (type > FOC_TYPE_SVPWM) type = FOC_TYPE_SPWM;
-    foc_obj.type = type;
-}
-
-void lt_foc_set(uint8_t type)
-{
-    if (type > FOC_TYPE_SVPWM) type = FOC_TYPE_SPWM;
-    foc_obj.type = type;
+    memset(foc, 0, sizeof(lt_foc_object));     /* reso/step 清零，update 就会直接返回 */
 }
 
 /*==============================================================================
- * 核心处理函数：输入 浮点数 格式的 D/Q 轴相电压指令[-1,1]，输出占空比 [0-1]
- * 输入值 = 原始值相对母线电压一半的标幺值，Vq = 1.0 pu 等价于 Vq = Vdc/2 (V)。  
- * 实例：Vd = 0, Vq = 1.0,  
- * 即Q轴相电压为母线电压Vdc的一半，即 Vq（原始值） = Vdc/2
- * 对应的线电压：sqrt(3)*Vdc/2 = 0.866 Vdc, 母线电压利用率 86.6%
- * SVPWM 线性调制区允许输出的 Vq <= 1.0 * 2/sqrt(3) = 1.154 ==> 母线电压利用率：100%
- * 用乘法代替除法，提高执行效率
- * SVPWM ：空间电压矢量 PWM 调制
- * 这个函数部分参考了 SimpleFOC 的实现，见 https://www.simplefoc.com/，主要还是自己推导的
+ * 设置电角度单圈分辨率：一个电周期对应的 the 增量
+ * the -> 相位的除法/取模在这里一次算完（冷路径），存成 Q16.16 相位增量
+ * reso 为 2 的幂（16384、262144 …）时 step 精确，正/负 the、多圈 the 都无误差
  *==============================================================================*/
-
-#define SVPWM_LIMIT  (1.1547005f)  				/* 2/sqrt(3)，对应100%母线电压利用率 */
-
-void lt_foc_process(float Vd, float Vq, float angle_el)
+void lt_foc_set(uint32_t reso)
 {
-	lt_foc_object *foc = &foc_obj;				/* 指针调用，局部变量直接进寄存器，性能更好 */
-	/* 电压限幅 [-1.154, 1.154] */				
-	Vd = CONSTRAINS(Vd, SVPWM_LIMIT, -SVPWM_LIMIT);	/* SVPWM的线性调制区更大 */
-	Vq = CONSTRAINS(Vq, SVPWM_LIMIT, -SVPWM_LIMIT);
-    /* 转子电角度归一化并获取正余弦 */
-    angle_el = lt_normalize(angle_el);  		/* 输出：[0, 2*pi) */
-    float c = lt_cos(angle_el);					/* 快速查表法 */
-    float s = lt_sin(angle_el);					/* 快速查表法 */
-
-    /* Park 逆变换：得到 alpha 和 beta 相归一化电压 [-1,1]
-	 * V_alpha = c*Vd - s*Vq, V_beta = s*Vd + c*Vq 
-	 */
-	float V_alpha = c*Vd - s*Vq;
-    float V_beta  = s*Vd + c*Vq;
-	/* 获取当前所在扇区 ： 1,2,3,4,5,6 */
-	angle_el = lt_atan2(V_beta, V_alpha);		/* 获取空间电压矢量的电角度: [0, 2*pi) */
-	/* 注意！！！ 此时的电角度含义发生了改变 */
-	uint8_t sector = (uint8_t)(angle_el * _PI_3_INV) + 1;
-	
-	/* 计算空间电压矢量的作用时间 [0,1] */
-	float Uout = lt_sqrt(Vd*Vd + Vq*Vq);	 	/* 计算空间电压矢量幅值, 采用快速开方，精度很高 */
-	/* 线性调制区：Uout <= 1.154 */
-	float T1 = _SQRT_3_2 * lt_sin(sector *_PI_3 - angle_el) * Uout;
-	float T2 = _SQRT_3_2 * lt_sin(angle_el - (sector-1.0f)  * _PI_3) * Uout;
-	
-	/* 过调制处理：T1 + T2 > 1 时等比例缩小 
-	 * 最大程度利用电机转矩
-	 * 即 |Uout| > 0.577f 时，触发过调制
-	 */
-	float T_sum = T1 + T2;
-	if (T_sum > 1.0f) {
-		float T_inv = 1.0f / T_sum;
-		T1 *= T_inv;
-		T2 *= T_inv;
-	}
-	float T0 = 1.0f - T1 - T2;					/* 获取零矢量作用时间 */
-	float T0_half = T0 * 0.5f;					/* T0/2 ==> 改乘法为除法优化性能 */
-	float Ta, Tb, Tc;							/* 三相占空比 [0,1] */
-	/* 计算最终的占空比 */						
-	switch(sector)
-	{
-		case 1:
-			Ta = T1 + T2 + T0_half;
-			Tb = T2 + T0_half;
-			Tc = T0_half;
-			break;
-		case 2:
-			Ta = T1 +  T0_half;
-			Tb = T1 + T2 + T0_half;
-			Tc = T0_half;
-			break;
-		case 3:
-			Ta = T0_half;
-			Tb = T1 + T2 + T0_half;
-			Tc = T2 + T0_half;
-			break;
-		case 4:
-			Ta = T0_half;
-			Tb = T1+ T0_half;
-			Tc = T1 + T2 + T0_half;
-			break;
-		case 5:
-			Ta = T2 + T0_half;
-			Tb = T0_half;
-			Tc = T1 + T2 + T0_half;
-			break;
-		case 6:
-			Ta = T1 + T2 + T0_half;
-			Tb = T0_half;
-			Tc = T1 + T0_half;
-			break;
-		default:  
-			Ta = 0;
-			Tb = 0;
-			Tc = 0;
-	}
-	
-	/* 记录最终的占空比 */
-	foc->dutyA = Ta;
-	foc->dutyB = Tb;
-	foc->dutyC = Tc;
+    if (reso == 0) return;                     /* 非法值保护 */
+    foc->reso = reso;
+    /* step = (65536 * 65536) / reso = 每个计数对应的相位增量
+     * + (reso >> 1) 是除法四舍五入项（加半个除数），即 round(2^32 / reso)
+     * 2 的幂时精确；否则累积舍入误差 < the/65536 个相位单位，多圈/负数宜先取模 */
+    foc->step = (uint32_t)(((1ULL << 32) + (uint64_t)(reso >> 1)) / reso);
 }
 
 /*==============================================================================
- * 核心处理函数：输入 浮点数 格式的 D/Q 轴电压指令[-1,1]，输出占空比 [0-1]
- * 输入值 = 原始值相对母线电压一半的标幺值，Vq = 1.0 pu 等价于 Vq = Vdc/2 (V)。  
- * 其余电压调制方法（非 SVPWM）：
- * SPWM+均值注入 在线性调制区和SVPWM是等效的，大部分情况下能模拟SVPWM
- * 函数代码部分参考了 SimpleFOC 的实现，见 https://www.simplefoc.com/，主要是自己写的
+ * 纯定点接口：输入 Q15 格式的 D/Q 轴电压指令（1.0 pu = Vdc/√3）和电角度计数
+ * the：(单圈编码器原始计数 - 电角度零点偏置) × 极对数，可以加上延迟补偿量 
+ * 限幅放在矢量域：|V| > 1.0 pu 时整体等比缩小，各方向可用电压一致、方向不变；
+ * 正常工况只多一次乘加比较，只有打满时才开方+缩放
+ * 相位 = the 先按 step 缩放到 0~65535（对应 0~2π），2^16 截断即自然回绕
+ * 内部全程整数运算，热路径无除法、无取模、无浮点
  *==============================================================================*/
-void lt_foc_process2(float Vd, float Vq, float angle_el)
+void lt_foc_update(int32_t Vd, int32_t Vq, uint32_t the, int32_t dutys[3])
 {
-	lt_foc_object *foc = &foc_obj;				/* 指针调用，局部变量直接进寄存器，性能更好 */
-	/* 电压限幅 [-1,1] */
-	if(foc->type != FOC_TYPE_SVPWM){
-		Vd = CONSTRAINS(Vd, 1.0f, -1.0f);
-		Vq = CONSTRAINS(Vq, 1.0f, -1.0f);
-	}else{
-		Vd = CONSTRAINS(Vd, SVPWM_LIMIT, -SVPWM_LIMIT);		/* SVPWM的线性调制区更大 */
-		Vq = CONSTRAINS(Vq, SVPWM_LIMIT, -SVPWM_LIMIT);
-	}
-    /* 转子电角度归一化并获取正余弦 */
-    angle_el = lt_normalize(angle_el);  		/* 输出：[0, 2*pi) */
-    float c = lt_cos(angle_el);					/* 快速查表法 */
-    float s = lt_sin(angle_el);					/* 快速查表法 */
+    if (foc->reso == 0) return;                        /* 未设置分辨率，直接返回 */
 
-    /* Park 逆变换：得到 alpha 和 beta 相归一化电压 [-1,1]
-	 * V_alpha = c*Vd - s*Vq, V_beta = s*Vd + c*Vq 
-	 */
-	float V_alpha = c*Vd - s*Vq;
-    float V_beta  = s*Vd + c*Vq;
-
-    /* Clark 逆变换：得到三相归一化电压 [-1,1]
-     * Va = V_alpha 
-     * Vb = -0.5*V_alpha + sqrt3/2*V_beta
-     * Vc = -0.5*V_alpha - sqrt3/2*V_beta 
-	 */
-    float half_alpha = 0.5f * V_alpha;                      /* 0.5f * V_alpha */
-    float beta_part =  _SQRT_3_2 * V_beta;                  /* sqrt(3)/2 * V_beta ≈ 0.8660254 * V_beta */
-
-    float Va = V_alpha;										/* A相电压 */
-    float Vb = -half_alpha + beta_part;						/* B相电压 */
-    float Vc = -half_alpha - beta_part;						/* C相电压 */
-
-    /* 零序分量注入，提高直流母线电压利用率 */
-    float up = 0;
-    switch (foc->type) {
-        case FOC_TYPE_SPWM_1: {                             /* 最小值注入 */
-            float min_abc = lt_minf(Va, lt_minf(Vb, Vc));   /* 获取最小值 */
-            up = -min_abc - 1.0f;                           /* -min - 1，使最小相电压为 -1 */
-            break;
-        }
-		case FOC_TYPE_SVPWM:								/* 调用该接口时，用均值注入模拟 SVPWM */
-        case FOC_TYPE_SPWM_2: {                             /* 均值注入 */
-            float min_abc = lt_minf(Va, lt_minf(Vb, Vc));   /* 获取最小值 */
-            float max_abc = lt_maxf(Va, lt_maxf(Vb, Vc));
-            up = -(max_abc + min_abc) * 0.5f;               /* -(max+min)/2, 等效 SVPWM 的三角波零序分量 */
-            break;
-        }
-		case FOC_TYPE_TRAPZ: {			/* 六步换相法 */
-			if(Vq < 0){					/* 反向旋转，即电角度滞后 180° */
-				angle_el = lt_normalize(angle_el + _PI);
-				Vq = -Vq;
-			}
-			/* 获取当前电角度对应的 导通区 */	
-			uint8_t i = (uint8_t)((angle_el+_PI_6) * _PI_3_INV);	
-			if(i >= 6 || i == 0) i = 6;
-			i = i - 1;
-			Va = Vq * trapz_6_table[i][0];
-			Vb = Vq * trapz_6_table[i][1];
-			Vc = Vq * trapz_6_table[i][2];
-			break;
-		}
-        case FOC_TYPE_SPWM: break;                         /* 标准 SPWM, 注入值为0 */
-        default:    break;
+    /* 矢量域限幅：|V| ≤ 1.0 pu（= Vdc/√3）。逐轴限幅会把方向拧偏——对角线方向
+     * 只能给到 √2 倍量程的一半，这里整体缩放，方向不动。
+     * 先夹到圆外接方框内，保证 mag2 不顶出 32 位（46340² × 2 < 2^32）*/
+    Vd = lt_clamp_i32(Vd, FOC_Q15_VMAX_I32, -FOC_Q15_VMAX_I32);
+    Vq = lt_clamp_i32(Vq, FOC_Q15_VMAX_I32, -FOC_Q15_VMAX_I32);
+    int64_t mag2 = (int64_t)Vd * Vd + (int64_t)Vq * Vq;
+    if (mag2 > (int64_t)FOC_Q15_ONE_I32 * FOC_Q15_ONE_I32) {
+        uint32_t m = lt_sqrt_u32((uint32_t)mag2);
+        /* 两轴共用同一个除数 m，所以只算一次倒数、各轴一次乘法：
+         *   inv = 2^30 / m   （Q15 倒数；m ∈ [32768, 65534] ⇒ inv ∈ [16385, 32768]）
+         *   Vd·32768/m 与 (Vd·inv)>>15 在精确算术上等价，省掉一次 64 位除法。
+         * 钳位后 |Vd| ≤ 46340、inv ≤ 32768，乘积 < 2^31，int64 只为免去符号扩展顾虑 */
+        int32_t inv = (int32_t)(((int64_t)FOC_Q15_ONE_I32 << 15) / (int32_t)m);
+        Vd = (int32_t)(((int64_t)Vd * inv) >> 15);
+        Vq = (int32_t)(((int64_t)Vq * inv) >> 15);
     }
 
-    /* 注入零序分量 */
-    Va += up;
-    Vb += up;
-    Vc += up;
+    /* 相位 = the * step >> 16：1 条 MULS + 1 条移位，无除法、无取模
+     * 只取 32 位乘积的 bits16~31，2^16 自然截断 == 65536（对应 2π）回绕
+     * reso 为 2 的幂时 step 精确：正/负 the、多圈 the 都自动精确回绕 */
+    uint16_t phase = (uint16_t)((the * foc->step) >> 16);
 
-	/* 将归一化电压 V [-1, 1] 映射到占空比 [0, 1] */
-    /* 数学公式: duty = (V + 1) / 2                                */
-	/* 得到最终的占空比 */
-    foc->dutyA = (Va + 1.0f) * 0.5f;
-    foc->dutyB = (Vb + 1.0f) * 0.5f;
-    foc->dutyC = (Vc + 1.0f) * 0.5f;
+    /* 1) Q15 正余弦（与 lt_foc_clark_park 共用同一个 inline） */
+    int16_t s, c;
+    foc_sin_cos(phase, &s, &c);
+
+    /* 2) Park 逆变换：Q30 乘积直接相加减，最后只移位一次
+     *    （不拆回 int16，省掉 4 条符号扩展；精度也只舍入一次）
+     *    |Vα| 上限 √2：Q30 累加最大 2*(32767*32768) = 2^31-65536，int32 不溢出 */
+    int32_t V_alpha = (((int32_t)c * Vd) - ((int32_t)s * Vq)) >> 15;
+    int32_t V_beta  = (((int32_t)s * Vd) + ((int32_t)c * Vq)) >> 15;
+
+    /* 3) 扇区判定：三条判别线符号，无需 atan2
+     * √3·Vα 用 √3/2 常数配 >>14，避免 |Vα| 接近 √2 时 int32 乘积溢出 */
+    int32_t t  = (V_alpha * FOC_Q15_SQRT3_2_I32) >> 14;
+    int32_t d2 =  t - V_beta;
+    int32_t d3 = -t - V_beta;
+    uint8_t sector;
+
+    if (V_beta < 0) {
+        if (d2 < 0)         sector = 4;   /* θ ∈ [180°, 240°) */
+        else if (d3 < 0)    sector = 6;   /* θ ∈ [300°, 360°) */
+        else                sector = 5;   /* θ ∈ [240°, 300°) */
+    } else {
+        if (d2 < 0)         sector = (d3 < 0) ? 2 : 3;  /* θ ∈ (60°,120°) / (120°,180°) */
+        else                sector = 1;                 /* θ ∈ [0°, 60°] 或零矢量 */
+    }
+
+    /* 4) 先计算基向量投影，扇区里只做加减；1.0 pu = Vdc/√3 */
+    int32_t va = (V_alpha * FOC_Q15_SQRT3_2_I32) >> 15;   /* Vα·√3/2 */
+    int32_t hb = (V_beta  * FOC_Q15_HALF_I32)    >> 15;   /* Vβ/2 */
+    int32_t T1, T2, T0_half;
+    int32_t Ta, Tb, Tc;
+
+    switch (sector)
+    {
+        case 1: {  /* sin60=√3/2 cos60=1/2；sin0=0 cos0=1 */
+            T1 = va - hb;
+            T2 = V_beta;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T1 + T2 + T0_half;
+            Tb = T2 + T0_half;
+            Tc = T0_half;
+            break;
+        }
+        case 2: {  /* sin120=√3/2 cos120=-1/2；sin60=√3/2 cos60=1/2 */
+            T1 = va + hb;
+            T2 = hb - va;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T1 + T0_half;
+            Tb = T1 + T2 + T0_half;
+            Tc = T0_half;
+            break;
+        }
+        case 3: {  /* sin180=0 cos180=-1；sin120=√3/2 cos120=-1/2 */
+            T1 = V_beta;
+            T2 = -hb - va;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T0_half;
+            Tb = T1 + T2 + T0_half;
+            Tc = T2 + T0_half;
+            break;
+        }
+        case 4: {  /* sin240=-√3/2 cos240=-1/2；sin180=0 cos180=-1 */
+            T1 = hb - va;
+            T2 = -V_beta;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T0_half;
+            Tb = T1 + T0_half;
+            Tc = T1 + T2 + T0_half;
+            break;
+        }
+        case 5: {  /* sin300=-√3/2 cos300=1/2；sin240=-√3/2 cos240=-1/2 */
+            T1 = -va - hb;
+            T2 = va - hb;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T2 + T0_half;
+            Tb = T0_half;
+            Tc = T1 + T2 + T0_half;
+            break;
+        }
+        default: { /* 扇区 6：sin360=0 cos360=1；sin300=-√3/2 cos300=1/2 */
+            T1 = -V_beta;
+            T2 = hb + va;
+            SVPWM_SCALE_T0_Q15(T1, T2, T0_half);
+            Ta = T1 + T2 + T0_half;
+            Tb = T0_half;
+            Tc = T1 + T0_half;
+            break;
+        }
+    }
+
+    /* 5) 输出三相占空比：Ta/Tb/Tc 本身就在 [0,32768]，正好是 Q15 占空比（32768 = 100%）*/
+    if (dutys) {
+        dutys[0] = Ta;
+        dutys[1] = Tb;
+        dutys[2] = Tc;
+    }
 }
 
 /*==============================================================================
- * 核心处理函数：输入 浮点数 格式的 D/Q 轴电压指令[-1,1]，输出占空比 [0-1]
- * 用乘法代替除法，提高执行效率
- * 两个六步换向电压调制方法（适合于 BLDC）
- * 虽然挂羊头卖狗肉，但仍然是在同一套框架下的，没必要额外搞一个 lt_trapz.c 文件
+ * 纯定点 Clarke + Park：三相 → d/q（lt_foc_update 的正变换）
+ * fnum[3]：三相电流/电压，Q15 标幺（32767 = 1.0 pu）
+ * angle  ：电角度计数，与 lt_foc_update 的 the 同一约定（共用 foc->step）
+ * fd/fq  ：d/q 分量，Q15 标幺。
+ * Clarke 天然抑制共模：三路共同偏置在 2a-b-c 里会抵消。
  *==============================================================================*/
-void lt_foc_process3(float Vq, uint8_t hallA, uint8_t hallB, uint8_t hallC)
+void lt_foc_clark_park(int32_t fnum[3], uint32_t the, int32_t *fd, int32_t *fq)
 {
-   	lt_foc_object *foc = &foc_obj;				/* 指针调用，局部变量直接进寄存器，性能更好 */
-	/* 电压限幅 [-1,1] */
-	Vq = CONSTRAINS(Vq, 1.0f, -1.0f);
-	
-	uint8_t signal = 0;
-	signal |= (hallA << 2);						/* bit2 */
-	signal |= (hallB << 1);						/* bit1 */
-	signal |= (hallC << 0);						/* bit0 */
-	
-	uint8_t i = hall_map[signal];
-	if(i == 0){									/* 霍尔信号故障，直接返回 */
-		foc->dutyA = 0;
-		foc->dutyB = 0;
-		foc->dutyC = 0;
-		return;
-	}
-	
-	uint8_t sector = ((i - 1) + 3) % 6;							    /* 下标 0 -> 5 */
-	if(Vq < 0){
-		Vq 	   = -Vq;
-		sector = (sector + 3) % 6;						/* 电角度 + 180°，对应反向 */
-	}
-	
-	float Va = Vq * trapz_6_table[sector][0];
-	float Vb = Vq * trapz_6_table[sector][1];
-	float Vc = Vq * trapz_6_table[sector][2];
-	/* 这里不需要注入 零序分量 */
-	/* 将归一化电压 V [-1, 1] 映射到占空比 [0, 1] <==> 中心电压调制 */
-    /* 数学公式: duty = (V + 1) / 2                                */
-	/* 得到最终的占空比 */
-    foc->dutyA = (Va + 1.0f) * 0.5f;
-    foc->dutyB = (Vb + 1.0f) * 0.5f;
-    foc->dutyC = (Vc + 1.0f) * 0.5f;
-}
+    if (foc->reso == 0 || fnum == 0) return;            /* 未设置 / 空指针 */
 
-void lt_foc_get_dutys(float *dutyA, float *dutyB,  float *dutyC)
-{                              
-	if (!dutyA || !dutyB || !dutyC)	  return;	/* 判空 */ 
-    lt_foc_object *foc = &foc_obj;				/* 指针调用，局部变量直接进寄存器，性能更好 */
-    *dutyA = foc->dutyA;
-    *dutyB = foc->dutyB;
-    *dutyC = foc->dutyC;
+    /* 与 lt_foc_update 逐位一致：phase = the * step >> 16 */
+    uint16_t phase = (uint16_t)((the * foc->step) >> 16);
+
+    int16_t s, c;
+    foc_sin_cos(phase, &s, &c);
+
+    /* Clarke（幅值不变）：fα = (2a-b-c)/3，fβ = (b-c)/√3
+     * 1/3、1/√3 用 Q15 倒数乘，避免热路径除法（误差 < 4e-5）*/
+    int32_t d2 = 2 * fnum[0] - fnum[1] - fnum[2];       /* |·| ≤ 3·32767 */
+    int32_t d3 = fnum[1] - fnum[2];                     /* |·| ≤ 2·32767 */
+    int32_t fa = (d2 * 10923) >> 15;                    /* 1/3  × 32768 */
+    int32_t fb = (d3 * 18919) >> 15;                    /* 1/√3 × 32768 */
+    /* 三相严重不平衡时 |iβ| 可到 1.15·32767，先夹住：
+     * 既是物理上的输入越界保护，也保证下面 Park 的 Q30 累加不溢出 */
+    fa = lt_clamp_i32(fa, FOC_Q15_MAX_I32, -FOC_Q15_MAX_I32);
+    fb = lt_clamp_i32(fb, FOC_Q15_MAX_I32, -FOC_Q15_MAX_I32);
+
+    /* Park 正变换：Q30 乘积直接相加减，最后只移位一次
+     * |c|,|s| ≤ 32767、|fα|,|fβ| ≤ 32767 ⇒ 2·32767² < 2^31，int32 不溢出 */
+    if (fd) *fd = ( c * fa + s * fb) >> 15;
+    if (fq) *fq = (-s * fa + c * fb) >> 15;
+    /* 不做输出饱和：|fd| ≤ |fαβ|，只有矢量模长超过 1.0 pu才可能越界，
+     * 那种场合 FOC 输出已无意义，交给保护处理 */
 }

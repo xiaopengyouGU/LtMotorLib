@@ -2,7 +2,7 @@
 # HAL 是已经编好的底层驱动 SDK。
 get_filename_component(LTM_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 
-set(LTM_FOC_BOARD        "ra8t2"                                     CACHE STRING   "板级配置")
+set(LTM_BOARD        "ra8t2"                                     CACHE STRING   "板级配置")
 set(LTM_HAL_SDK_DIR      "${LTM_ROOT}/LTM_HAL/ltm_hal_ra8t2_CPU0"    CACHE PATH     "该板使用的 LTM_HAL SDK 包")
 set(LTM_BOARD_TOOLCHAIN  "${LTM_HAL_SDK_DIR}/cmake/toolchain.cmake"  CACHE FILEPATH "该板的工具链")
 set(LTM_BOARD_LINKER     "${CMAKE_CURRENT_LIST_DIR}/linker/fsp.ld"   CACHE FILEPATH "App 链接脚本")

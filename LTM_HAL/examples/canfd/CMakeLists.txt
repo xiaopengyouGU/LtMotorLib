@@ -12,10 +12,10 @@ cmake_minimum_required(VERSION 3.20)
 
 # 板级映射（HAL SDK 包、链接脚本、J-Link 器件名）：boards/<board>/board.cmake
 get_filename_component(LTM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-if(NOT LTM_FOC_BOARD)
-    set(LTM_FOC_BOARD "ra8t2")
+if(NOT LTM_BOARD)
+    set(LTM_BOARD "ra8t2")
 endif()
-include(${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake)
+include(${LTM_ROOT}/boards/${LTM_BOARD}/board.cmake)
 get_filename_component(LTM_BOARD_LINKER_DIR "${LTM_BOARD_LINKER}" DIRECTORY)
 
 # 公共组件源码：components/control、components/math、components/protocol
