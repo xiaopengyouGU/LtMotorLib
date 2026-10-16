@@ -1,0 +1,13 @@
+# ===== 构建产物 / 生成文件（不入库）=====
+build/
+bin/
+*.o
+*.obj
+*.a
+*.elf
+*.hex
+*.bin
+*.map
+*.d
+__pycache__/
+*.pyc

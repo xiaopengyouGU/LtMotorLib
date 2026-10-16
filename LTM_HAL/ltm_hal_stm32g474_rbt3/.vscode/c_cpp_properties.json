@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-STM32G474-LTM_HAL",
+            "includePath": [
+                "${workspaceFolder}/src/components",
+                "${workspaceFolder}/src/drivers",
+                "${workspaceFolder}/config/CMSIS/Include",
+                "${workspaceFolder}/config/CMSIS/Device/ST/STM32G4xx/Include",
+                "${workspaceFolder}/config/STM32G4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/config/STM32G4xx_HAL_Driver/Inc/Legacy"
+            ],
+            "defines": [
+                "STM32G474xx",
+                "STM32G474RCT6",
+                "USE_HAL_DRIVER",
+                "USE_FULL_LL_DRIVER",
+                "ARM_MATH_CM4",
+                "ARM_MATH_MATRIX_CHECK",
+                "ARM_MATH_ROUNDING"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "intelliSenseMode": "gcc-arm",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/src",
+                    "${workspaceFolder}/config"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            }
+        }
+    ],
+    "version": 4
+}

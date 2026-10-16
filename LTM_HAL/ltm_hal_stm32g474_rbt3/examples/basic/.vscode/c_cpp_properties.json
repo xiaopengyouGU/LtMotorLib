@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-GCC-RA8T2-Example",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/lib"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

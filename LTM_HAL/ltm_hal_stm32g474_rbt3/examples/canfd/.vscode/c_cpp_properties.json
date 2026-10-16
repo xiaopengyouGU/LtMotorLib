@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-GCC-RA8T2-Example",
+            "includePath": [
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/lib"
+            ],
+            "defines": [
+                "_RENESAS_RA_",
+                "_RA_CORE=CPU0",
+                "_RA_ORDINAL=1"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}
