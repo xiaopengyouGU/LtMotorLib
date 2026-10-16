@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 双 MT6835 SPI 编码器快照读取（SPI1 + SPI3）

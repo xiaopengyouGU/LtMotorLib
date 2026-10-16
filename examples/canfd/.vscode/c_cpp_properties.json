@@ -4,6 +4,7 @@
             "name": "ARM-GCC-RA8T2-Example",
             "includePath": [
                 "${workspaceFolder}/src",
+                "../../components",
                 "${workspaceFolder}/lib"
             ],
             "defines": [

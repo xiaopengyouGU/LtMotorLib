@@ -24,7 +24,7 @@ python script.py            # 构建示例（cmake 手动构建亦可）
 ### 2. 干掉标准库浮点打印（省 ~9.3KB）
 
 - `CMakeLists.txt`：移除 `-u _printf_float`，不再链接标准库浮点 printf
-- `src/math/basic/lt_math.h`：新增 `LT_FTOAT3` 宏——纯整数格式化（`%ld`）实现
+- `components/math/basic/lt_math.h`：新增 `LT_FTOAT3` 宏——纯整数格式化（`%ld`）实现
   浮点转字符串，固定 3 位小数，带四舍五入与进位处理，不依赖浮点格式化代码
 - `src/main.c`：全部 `%.1f / %.4f` 调用改为 `%s` + `LT_FTOAT3`
 

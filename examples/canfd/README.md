@@ -10,7 +10,7 @@
 | LTM_HAL | `lib/libLTM_HAL.a` + `lib/ltm_hal/ltm_hal.h` | 外设驱动：PWM/ADC/编码器/CAN-FD/UART/LED |
 | LTM_CTRL | （已合并进 libLTM_FOC.a） | 控制算法：FOC/PID/测速/死区补偿等 |
 | LTM_FOC | `lib/libLTM_FOC.a` + `lib/ltm_foc/lt_motor.h` | 胶水层：状态机 + 25kHz 三环调度 + 一键初始化 |
-| App | `src/main.c` + `src/protocol/` | 协议解析、命令分发、曲线上报 |
+| App | `src/main.c` + `components/protocol/` | 协议解析、命令分发、曲线上报 |
 
 > `libLTM_FOC.a` 在 SDK 构建期已把 `LTM_CTRL` 合并进去，应用侧只需链接 `libLTM_FOC.a + libLTM_HAL.a`，
 > 不会出现重复定义。换平台时只需替换 `lib/` 目录内容。

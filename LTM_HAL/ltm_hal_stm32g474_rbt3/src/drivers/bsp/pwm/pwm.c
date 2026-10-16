@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 三相 PWM（TIM1 中心对齐 + 互补输出 + 死区）

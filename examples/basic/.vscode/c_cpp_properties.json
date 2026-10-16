@@ -4,6 +4,7 @@
             "name": "RISC-V-HPM6E8Y-LTM_FOC-Basic",
             "includePath": [
                 "${workspaceFolder}/src",
+                "../../components",
                 "${workspaceFolder}/lib/**"
             ],
             "defines": [],

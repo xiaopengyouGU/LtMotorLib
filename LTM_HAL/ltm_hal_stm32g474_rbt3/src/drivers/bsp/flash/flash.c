@@ -1,5 +1,5 @@
 /*
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: MIT
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 片内 Flash（页擦除 2KB，64bit 双字编程）

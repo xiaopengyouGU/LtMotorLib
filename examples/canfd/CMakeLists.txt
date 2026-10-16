@@ -23,14 +23,15 @@ add_compile_definitions(${LTM_BOARD_DEFINES})
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${LTM_ROOT}/components             # 公共组件源码（protocol/）
     ${LTM_HAL_SDK_DIR}/bin          # ltm_hal/ltm_hal.h（已编译 SDK 的交付头）
     ${LTM_ROOT}/LTM_FOC/bin         # ltm_foc/lt_motor.h
 )
 
 set(EXAMPLE_SOURCES
     src/main.c
-    src/protocol/ltm_commut.c
-    src/protocol/protocol.c
+    ${LTM_ROOT}/components/protocol/ltm_commut.c
+    ${LTM_ROOT}/components/protocol/protocol.c
 )
 
 add_executable(${PROJECT_NAME}.elf ${EXAMPLE_SOURCES})

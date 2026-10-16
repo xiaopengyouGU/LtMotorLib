@@ -24,6 +24,7 @@
 
 /* ---- 电机参数 ---- */
 #define POLE_PAIRS           7   
+#define Q15_MAX              32767         /* Q15 能表示的最大值 */
 static float   vq_target = 0.0f;          /* 开环 Q 轴电压指令（%，-100~100）*/
 static uint8_t run_flag  = 0;             /* 运行标志 */
 
@@ -52,24 +53,23 @@ int main(void)
      * 对 5000 次 ADC 扫描取平均作为零点偏置（20kHz ≈ 250ms）。
      * 校准完成前 adc_get_current 返回 0。 */
     ltm_pwm_start();
-    ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+    ltm_pwm_set_dutys(0, 0, 0);
     ltm_delay_ms(200);                   /* 等电流尖峰消除 */
     ltm_adc_calibrate_zero(2500);        /* 2500 次扫描平均 */
     ltm_delay_ms(500);                   /* 等校准完成 */
     ltm_commut_printf("ADC calib done! \r\n");
 
     /* ---- 调试：打印校准 offset + 停机偏置自检 ---- */
-    float sIa = 0, sIb = 0, sIc = 0;
-    float dIa, dIb, dIc;
+    int32_t sIa = 0, sIb = 0, sIc = 0, dIa, dIb, dIc;
     for (int i = 0; i < 500; i++) {
         ltm_adc_get_current(&dIa, &dIb, &dIc);
         sIa += dIa; sIb += dIb; sIc += dIc;
         ltm_delay_ms(2);
     }
     char fbuf[3][16];
-    LT_FTOAT3(fbuf[0], sIa / 500.0f);
-    LT_FTOAT3(fbuf[1], sIb / 500.0f);
-    LT_FTOAT3(fbuf[2], sIc / 500.0f);
+    LT_FTOAT3(fbuf[0], sIa / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
+    LT_FTOAT3(fbuf[1], sIb / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
+    LT_FTOAT3(fbuf[2], sIc / 500.0f * LTM_ADC_CURRENT_PER_COUNT);
     ltm_commut_printf("standstill mean A: %s A\r\n", fbuf[0]);
     ltm_commut_printf("standstill mean B: %s A\r\n", fbuf[1]);
     ltm_commut_printf("standstill mean C: %s A\r\n", fbuf[2]);
@@ -90,7 +90,7 @@ int main(void)
     float _dutyA, _dutyB, _dutyC;
     lt_foc_process(0.15f, 0.0f, 0.0f);
     lt_foc_get_dutys(&_dutyA, &_dutyB, &_dutyC);
-    ltm_pwm_set_dutys(_dutyA, _dutyB, _dutyC);
+    ltm_pwm_set_dutys(_dutyA * Q15_MAX, _dutyB * Q15_MAX, _dutyC * Q15_MAX);
     // ltm_pwm_set_dutys(0.21f, 0, 0);
     ltm_delay_ms(300);
     int32_t my_offset = ltm_enc_get_count();
@@ -114,11 +114,11 @@ int main(void)
             lt_foc_process(0.0f, vq_target * 0.01f, the);
             float dA, dB, dC;
             lt_foc_get_dutys(&dA, &dB, &dC);
-            ltm_pwm_set_dutys(dA, dB, dC);
+            ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
             ltm_led_set(LTM_LED_STOP, 0);
             ltm_led_set(LTM_LED_RUN, 1);
         }else{
-            ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+            ltm_pwm_set_dutys(0, 0, 0);
             ltm_led_set(LTM_LED_STOP, 1);
             ltm_led_set(LTM_LED_RUN, 0);
         }
@@ -128,17 +128,17 @@ int main(void)
             ltm_canfd_send(id, tx_buf, 16);
         }
         /* 7 条曲线：A/B/C 相电流、母线电压、驱动板温度、电机温度、机械角度 */
-        float Ia, Ib, Ic, vbus, temp_drv, temp_mot;
+        int32_t Ia, Ib, Ic, vbus, temp_drv, temp_mot;
         ltm_adc_get_current(&Ia, &Ib, &Ic);
         ltm_adc_get_vbus(&vbus);
         ltm_adc_get_temp(&temp_mot, &temp_drv);
         curves.size = 7;
-        curves.values[0] = Ia;
-        curves.values[1] = Ib;
-        curves.values[2] = Ic;
-        curves.values[3] = vbus;
-        curves.values[4] = temp_drv;
-        curves.values[5] = temp_mot;
+        curves.values[0] = Ia   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[1] = Ib   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[2] = Ic   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[3] = vbus * LTM_ADC_VOLTAGE_PER_COUNT;
+        curves.values[4] = temp_drv * LTM_ADC_TEMP_PER_COUNT;
+        curves.values[5] = temp_mot * LTM_ADC_TEMP_PER_COUNT;
         curves.values[6] = (float)ltm_enc_get_angle_deg();
         ltm_commut_send_curves(&curves);
 
@@ -187,7 +187,7 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
             break;
         case Data_CMD_Stop:
             run_flag = 0;
-            ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+            ltm_pwm_set_dutys(0, 0, 0);
             ltm_pwm_stop();
             ltm_commut_printf("Stop\n");
             ltm_commut_send(Data_CMD_Stop, &run_flag, 1);

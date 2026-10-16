@@ -10,6 +10,10 @@
 #===========================================================
 cmake_minimum_required(VERSION 3.20)
 
+# 公共组件源码：components/control、components/math、components/protocol
+get_filename_component(LTM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
+set(LTM_COMPONENTS ${LTM_ROOT}/components)
+
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/toolchain.cmake)
 
 project(ltm_hal_basic VERSION 1.0.0 LANGUAGES C ASM)
@@ -26,14 +30,15 @@ add_compile_definitions(
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/lib
+    ${LTM_COMPONENTS}                # 公共组件源码
 )
 
 set(EXAMPLE_SOURCES
     src/main.c
-    src/protocol/ltm_commut.c
-    src/protocol/protocol.c
-    src/control/foc/lt_foc.c
-    src/math/basic/lt_math.c
+    ${LTM_COMPONENTS}/protocol/ltm_commut.c
+    ${LTM_COMPONENTS}/protocol/protocol.c
+    ${LTM_COMPONENTS}/control/foc/lt_foc.c
+    ${LTM_COMPONENTS}/math/basic/lt_math.c
 )
 
 add_executable(${PROJECT_NAME}.elf ${EXAMPLE_SOURCES})
