@@ -1,0 +1,2 @@
+# shell 脚本在 Linux/CI 上跑，必须保持 LF 行尾（Windows 上 autocrlf 会转成 CRLF）
+*.sh text eol=lf
