@@ -1,6 +1,5 @@
 #include "protocol/protocol.h"
 #include<string.h>
-#include<stdio.h>
 
 typedef struct {
     uint8_t buffer[RB_SIZE];    /* 环形缓冲区 */
@@ -37,24 +36,12 @@ bool protocol_process(uint8_t *data_type, uint8_t *datas, uint16_t *data_len)   
 {
     bool res = rb_parse_frame(&prot->rb, data_type, datas, data_len);			 /* 调用环形缓冲区帧解析接口 */
 
-    if(res)
-    {
-        if(prot->flag)
-        {
-            printf("\nprocess protocol success!!! \n");
-            printf("data len = %d, \t data type : 0x%02X \n", *data_len, *data_type);
-            printf("recv datas : \n");
-            for(uint16_t i = 0; i < *data_len; i++)
-            {
-                printf("0x%02x \t",datas[i]);
-            }
-            printf("\n");
-        }
+    if(res) {
+        /* 调试打印已裁掉：标准 printf 会链入 newlib stdio/浮点库（省 ~35KB）；
+         * 需要时用 ltm_commut_printf 或上位机查看 */
     }
-    else
-    {
-        if(prot->flag) 
-            printf("process protocol failed! \n");
+    else {
+        /* 同上 */
     }
     return res;
 }
@@ -81,23 +68,7 @@ void protocol_package(uint8_t data_type, uint8_t *datas, uint16_t data_len)    /
     /* 记录发送缓冲区数据长度 */
     prot->buf_len = hdr_size + data_len + sizeof(crc);
 
-    /* 打印打包好的数据 */
-    if(prot->flag)
-    {
-        printf("send buf (len = %d) : \n", prot->buf_len);
-        for(uint16_t i = 0; i < prot->buf_len; i++)
-        {
-            printf("0x%02x ", send_buf[i]);
-        }
-        printf("\n");
-        printf("data len = %d, \t data type : 0x%02X \n",data_len, data_type);
-        printf("send datas : \n");
-        for(uint16_t i = 0; i < data_len; i++)
-        {
-            printf("0x%02x \t", datas[i]);
-        }
-        printf("\n");
-    }
+    /* 调试打印已裁掉（同上，省 newlib stdio）*/
 }
 
 uint8_t* protocol_datas(uint16_t *len)                  /* 获取发送缓冲区数据 */
@@ -197,30 +168,30 @@ static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *data_type, uint8_t *data_
     while (rb_available(rb) >= (hdr_size))  /* 至少要有帧头（2）+ 数据类型（1）+ 数据长度（1）*/
     {
         uint16_t header;
-        if(!rb_peek(rb, 0, (uint8_t*)&header, 2)) break;
-        if(header != FRAME_HEADER){
+        if (!rb_peek(rb, 0, (uint8_t*)&header, 2)) break;
+        if (header != FRAME_HEADER){
             rb_consume(rb, 1);      		/* 不是帧头，丢弃1字节 */
             continue;
         }
     
         protocol_header hdr;				/* 获取帧结构体 */
-        if(!rb_peek(rb, 0, (uint8_t*)&hdr, hdr_size)) break;
+        if (!rb_peek(rb, 0, (uint8_t*)&hdr, hdr_size)) break;
 		uint8_t hdr_data_len = hdr.data_len;
 		
         /* 验证接收数据的长度是否合法 */
-        if(hdr_data_len > PROTOCOL_DATA_SIZE){	/* 支持的最长数据：128字节 */	
+        if (hdr_data_len > PROTOCOL_DATA_SIZE){	/* 支持的最长数据：128字节 */	
             rb_consume(rb, 1);      		/* 丢弃1字节 */
             continue;
         }
 
         uint16_t total_len = hdr_size + hdr_data_len + 2;	/* 接收到的帧长度 */
-        if(total_len > RB_SIZE){			/* 环形缓冲区大小：默认 256 字节 */	
+        if (total_len > RB_SIZE){			/* 环形缓冲区大小：默认 256 字节 */	
             rb_consume(rb, 1);     			/* 丢弃1字节 */
             continue;
         }   
 
         /* 检查是否有完整的一帧 */
-        if(rb_available(rb) < total_len) break;
+        if (rb_available(rb) < total_len) break;
 
         /* 读取完整数据帧到缓冲区中，避免解析过程中发生数据覆盖 */
         uint8_t buffer[RECV_BUF_SIZE];
@@ -230,7 +201,7 @@ static bool rb_parse_frame(ring_buffer_t *rb, uint8_t *data_type, uint8_t *data_
 		
 		/* 开始 CRC 校验 */
 		uint16_t calc_crc = crc16_check(buffer, hdr_size + hdr_data_len);
-		if(calc_crc != crc_recv) {
+		if (calc_crc != crc_recv) {
 			rb_consume(rb, 1);  		 /* 丢弃一个字节，尝试重新同步 */
 			continue;           		 /* 继续while循环，寻找下一个帧头 */
 		}
