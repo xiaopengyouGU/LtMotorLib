@@ -8,6 +8,8 @@
  * 2026-10-14     Lvtou       改在线重规划：目标随时可改，每拍只解下一拍，不再预解算段
  * 2026-10-16     Lvtou       start 拆成"约束折算 / jerk 段 / 刹车定值"三段，对象按约束、
  *                            刹车定值、指令状态分组
+ * 2026-10-16     Lvtou       T 形补上终点捕获：整数 pos 的 floor 滞后让最小跳距达 2 Unit，
+ *                            目标落在格点之间时 is_done 恒为 0（脉冲停不下来）
  */
 #include "control/scurve/lt_scurve.h"
 #include <string.h>
@@ -46,6 +48,15 @@ struct lt_scurve_object {
     int32_t  vel_res;           /* 速度残差（1/1000 Unit/s）*/
     volatile uint8_t ready;     /* start 执行中挡住中断侧步进 */
 };
+
+/* T 形终点捕获门限：速度门限 = T_CAP_STEPS 拍速度台阶（a_dec·Ts/1000 × N），
+ * 位置门限 = T_CAP_D_UNIT 个 Unit */
+#ifndef T_CAP_STEPS
+#define T_CAP_STEPS     2
+#endif
+#ifndef T_CAP_D_UNIT
+#define T_CAP_D_UNIT    2
+#endif
 
 /* 私有：内部一律用指针书写，对外仍是 uint8_t idx */
 typedef struct lt_scurve_object *lt_scurve_t;
@@ -131,8 +142,8 @@ static void _jerk_init(lt_scurve_t s, const lt_scurve_config_t *config, uint16_t
     if (s->cfg.ak_dec < 1) s->cfg.ak_dec = 1;
 }
 
-/* 3) 刹车判据定值：先清空，T 形只留 a2（判据退化成经典的 v² ≥ 2·a_dec·|d|），
- *    S 形再补齐翻转段与收尾段的常数项。
+/* 3) 刹车判据定值：先清空。T 形的刹车判据退化成经典的 v² ≥ 2·a_dec·|d|，
+ *    只补终点捕获门限；S 形再补齐翻转段与收尾段的常数项。
  *      k = a_dec·Tj          b = 2a_dec·Ts/1000
  *      kk3 = ak_dec·j_step²·Ts²/3e6（翻向段的曲率项）
  *      c   = (a_dec·Tj)²/12（收尾段走过的距离）
@@ -141,7 +152,21 @@ static void _brake_init(lt_scurve_t s)
 {
     memset(&s->brake, 0, sizeof(s->brake));
     s->brake.a2 = 2 * (int64_t)s->cfg.a_dec;
-    if (s->cfg.j_step <= 0) return;                         /* T 形：只用 a2 */
+
+    if (s->cfg.j_step <= 0) {
+        /* T 形：加速度即时给定，没有翻转段和 jerk 收尾段，但终点捕获必须开——
+         * 整数 pos 是真实位置的 floor，刹车判据拿它当剩余距离，天生滞后一个 Unit，
+         * 从静止起步的最小跳距就成了 2 Unit：目标落在两个格点之间时曲线在 ±1 Unit
+         * 之间来回穿，pos == target && vel == 0 恒不成立，is_done 永远为 0（脉冲停不下来）。
+         * 速度门限取两拍台阶；位置门限 = 捕获速度下走一拍的距离 + T_CAP_D_UNIT 个 Unit
+         * （后者抵 floor 滞后与最后一拍行程；少算了它曲线会整个跳过窗口）*/
+        int64_t dv    = (int64_t)s->cfg.a_dec * s->cfg.Ts / 1000;   /* 一拍速度台阶 */
+        int64_t cap_v = T_CAP_STEPS * dv;
+        if (cap_v < 1) cap_v = 1;
+        s->brake.cap_v = (int32_t)cap_v;
+        s->brake.cap_d = (int32_t)(cap_v * s->cfg.Ts / 1000) + T_CAP_D_UNIT;
+        return;
+    }
 
     int64_t Tj_ms = (int64_t)s->cfg.a_dec * s->cfg.Ts / s->cfg.j_step;   /* 减速 jerk 段时长（ms）*/
     s->brake.k      = Tj_ms * s->cfg.a_dec / 1000;
