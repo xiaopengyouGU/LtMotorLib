@@ -1,6 +1,6 @@
 # LtMotorLib
 
-面向 PMSM/BLDC 的电机控制软件库。分层设计，底层驱动、控制胶水与算法模块彼此解耦；同一套控制代码按平台与板级配置编译，既能产出固件用的预编译库，也能在 PC 上跑闭环仿真与回归测试。
+面向 PMSM/BLDC 的电机控制软件库。分层设计，底层驱动、控制胶水层与算法模块彼此解耦；同一套控制代码按平台与板级配置编译，既能产出固件用的预编译库，也能在 PC 上跑闭环仿真与回归测试。
 
 许可：MIT。
 
@@ -9,18 +9,19 @@
 ```
 应用层（用户自行实现）
    │  #include "ltm_foc/lt_motor.h"
-LTM_FOC    控制胶水：状态机 + 三环级联调度 + 电机对象 API（内含 LTM_CTRL）
+LTM_FOC    控制胶水层：状态机 + 三环级联调度 + 电机对象 API（内含 LTM_CTRL）
    │  #include "ltm_hal/ltm_hal.h"
 LTM_HAL    底层驱动：把 MCU 外设抽象为电机所需的接口
    │
 目标硬件
 ```
 
-| 层 | 定位 | 交付物 |
-| --- | --- | --- |
-| LTM_CTRL | 纯算法：FOC、PID、PDOB、S 曲线规划、测速、陷波、参数校准与辨识 | `libLTM_CTRL.a` + 三个聚合头 |
-| LTM_FOC | 控制胶水：三环调度、状态机、模式管理、机型参数 | `libLTM_FOC.a`（内含 CTRL）+ `lt_motor.h` |
-| LTM_HAL | 底层驱动：PWM / ADC / 编码器 / 定时 / 通信 / Flash 的抽象接口 | 每个平台一对 `ltm_hal.h` + `libLTM_HAL.a` |
+
+| 层       | 定位                                                           | 交付物                                    |
+| -------- | -------------------------------------------------------------- | ----------------------------------------- |
+| LTM_CTRL | 纯算法：FOC、PID、PDOB、S 曲线规划、测速、陷波、参数校准与辨识 | `libLTM_CTRL.a` + 三个聚合头              |
+| LTM_FOC  | 控制胶水：三环调度、状态机、模式管理、机型参数                 | `libLTM_FOC.a`（内含 CTRL）+ `lt_motor.h` |
+| LTM_HAL  | 底层驱动：PWM / ADC / 编码器 / 定时 / 通信 / Flash 的抽象接口  | 每个平台一对`ltm_hal.h` + `libLTM_HAL.a`  |
 
 依赖方向单向：`应用 → LTM_FOC → LTM_HAL`；LTM_CTRL 只被 LTM_FOC 使用，不直接面向应用。
 
@@ -29,7 +30,7 @@ LTM_HAL    底层驱动：把 MCU 外设抽象为电机所需的接口
 - **应用层用户**：`libLTM_FOC.a` + `libLTM_HAL.a` + `lt_motor.h` + `ltm_hal.h` + 链接脚本；应用层由用户自行编写。
 - **自研胶水层的内部用户**：`libLTM_CTRL.a` + 三个聚合头，配合自己的调度实现。
 - LTM_CTRL 的静态库在 LTM_FOC 构建时以对象形式并入，用户无需关心其内部模块划分。
-- 本仓库不跟踪任何构建产物（`bin/` 与 `build/`），交付物一律由各 SDK 的 `script.py` 生成。
+- 本仓库当前不跟踪预编译库（`.a`），需要时从源码构建产生。
 
 ## 目录结构
 
@@ -38,15 +39,15 @@ cmake/       共享构建层：三份工具链（arm / riscv / pc）+ 对外头�
 boards/      板级映射：<board>/{board.cmake, user_param_def.h, linker/}
 LTM_CTRL/    算法库：平台无关，可在 PC 上编译、仿真与压测
 LTM_FOC/     控制胶水：构建时并入 LTM_CTRL，输出单头与合并库
-LTM_HAL/     平台驱动包：一个平台一份；示例（全平台共用）在 LTM_HAL/examples
-components/  控制公共源码：FOC（control）/ 数学（math）/ 协议（protocol）
-examples/    应用层例程：basic（串口承载 LTM 协议）、canfd（CAN-FD）
+LTM_HAL/     平台驱动包：一个平台一份，随该平台一起交付
+examples/    例程：basic（串口承载 LTM 协议）、canfd（CAN-FD）
 BootLoader/  IAP / UDS 在线升级：A/B 分区，升级失败可回滚
+python/      上位机辅助脚本（伯德图、SVPWM 对比等）
 ```
 
 ## 平台与板级
 
-- **平台驱动包**：`LTM_HAL/ltm_hal_ra6m4`、`LTM_HAL/ltm_hal_stm32g474_rbt3`、`LTM_HAL/ltm_hal_ra8t2_CPU0`，各自提供该平台的 `ltm_hal.h` 与 `libLTM_HAL.a`；接口函数跨平台同名同义，平台相关常量以宏的形式随该平台的头文件给出。
+- **平台驱动包**：`LTM_HAL/ltm_hal_ra6m4`、`LTM_HAL/ltm_hal_ra8t2_CPU0`，各自提供该平台的 `ltm_hal.h` 与 `libLTM_HAL.a`；接口函数跨平台同名同义，平台相关常量以宏的形式随该平台的头文件给出。
 - **板级映射**：`boards/<board>/board.cmake` 指定该板使用哪个 HAL 包、哪套工具链、哪个链接脚本与哪些 MCU 编译定义；机型参数在 `boards/<board>/user_param_def.h`。
 - 移植一个新平台：新增一份 HAL 平台包 + 在 `boards/` 下新增一份映射，控制代码无需改动。
 
@@ -61,17 +62,12 @@ python LTM_CTRL/script.py -t              # lt_speed 主机侧压测
 # 2) 控制胶水库（按板级参数编译）
 python LTM_FOC/script.py -s --board ra6m4
 
-# 3) HAL SDK（按平台；顺带构建 LTM_HAL/examples 下的共享例程）
-python LTM_HAL/script.py -s --hal ra6m4
-
-# 4) 应用层例程（链接 SDK 交付库与板级链接脚本，板级用 --board 选）
-python examples/basic/script.py -b --board ra6m4
-python examples/canfd/script.py -b --board ra6m4
+# 3) 例程（链接 SDK 交付库与板级链接脚本）
+python examples/basic/script.py -b
+python examples/canfd/script.py -b
 ```
 
 工具链不在 `PATH` 时，用 `-DLTM_ARM_TOOLCHAIN_DIR`、`-DLTM_RISCV_TOOLCHAIN_DIR`、`-DLTM_PC_TOOLCHAIN_DIR` 指定其 `bin` 目录。板级参数未指定时构建会直接报错，不会静默采用默认值。
-
-LTO 链接要求临时目录是纯 ASCII 路径：用户名含中文时把 `TMP` / `TEMP` 指到纯 ASCII 目录，否则 `lto-wrapper` 报 `could not open symbol resolution file`。
 
 ## 设计约定
 
