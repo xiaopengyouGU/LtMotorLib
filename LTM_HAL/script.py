@@ -32,7 +32,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 HAL_ROOT  = os.path.dirname(os.path.abspath(__file__))
 EXAMPLES  = os.path.join(HAL_ROOT, "examples")   # 例程统一放 LTM_HAL/examples（全平台共用）
-GENERATOR = "MinGW Makefiles"   # keep consistent with examples; auto-clean on mismatch
+GENERATOR = os.environ.get("LTM_CMAKE_GENERATOR", "MinGW Makefiles")  # CI 里可用 Unix Makefiles
 
 # 平台目录 -> 例程默认板级（boards/<board>）
 HAL_BOARD = {

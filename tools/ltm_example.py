@@ -22,7 +22,7 @@ import shutil
 import subprocess
 import sys
 
-GENERATOR       = "MinGW Makefiles"
+GENERATOR       = os.environ.get("LTM_CMAKE_GENERATOR", "MinGW Makefiles")  # CI 里可用 Unix Makefiles
 RE_JLINK_DEVICE = re.compile(r'set\(\s*LTM_BOARD_JLINK_DEVICE\s+"([^"]+)"')
 RE_JLINK_SPEED  = re.compile(r'set\(\s*LTM_BOARD_JLINK_SPEED\s+([0-9]+)')
 

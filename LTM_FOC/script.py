@@ -37,7 +37,7 @@ def ensure_cache(dirpath, source):
 def build_sdk(board):
     ensure_cache(SDK_BUILD, ROOT)
     shutil.rmtree(SDK_BUILD, ignore_errors=True)   # 每次干净重建，避免旧缓存里的工具链/生成器
-    cfg = ["cmake", "-G", "MinGW Makefiles", "-B", SDK_BUILD, "-S", ROOT,
+    cfg = ["cmake", "-G", os.environ.get("LTM_CMAKE_GENERATOR", "MinGW Makefiles"), "-B", SDK_BUILD, "-S", ROOT,
            "-DCMAKE_TOOLCHAIN_FILE=" + os.path.join(LTM_ROOT, "cmake", "toolchain_arm.cmake"),
            "-DLTM_BOARD=" + board,
            "-DCMAKE_BUILD_TYPE=Release"]

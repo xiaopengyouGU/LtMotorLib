@@ -17,7 +17,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-GENERATOR = "MinGW Makefiles"
+GENERATOR = os.environ.get("LTM_CMAKE_GENERATOR", "MinGW Makefiles")  # CI 里可用 Unix Makefiles
 PLATFORMS = ("arm", "riscv", "pc")
 TOOLCHAINS = {
     "arm":   os.path.join(ROOT, "../cmake", "toolchain_arm.cmake"),

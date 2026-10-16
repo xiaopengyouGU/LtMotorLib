@@ -2,6 +2,7 @@
 build/
 build_*/
 bin/
+.ci_tmp/
 __pycache__/
 *.pyc
 *.o
