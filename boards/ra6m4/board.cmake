@@ -9,3 +9,5 @@ set(LTM_BOARD_PARAM_H    "${CMAKE_CURRENT_LIST_DIR}/user_param_def.h"     CACHE 
 set(LTM_BOARD_LINKER     "${CMAKE_CURRENT_LIST_DIR}/linker/fsp.ld"        CACHE FILEPATH "链接脚本")
 set(LTM_BOARD_DEFINES  _RENESAS_RA_ _RA_CORE=CM33 _RA_ORDINAL=1 CACHE STRING "该板的 MCU 编译定义")
 set(LTM_BOARD_JLINK_DEVICE "R7FA6M4AF"                                     CACHE STRING   "J-Link device (flash)")
+set(LTM_BOARD_JLINK_SPEED  1000                                          CACHE STRING "J-Link SWD 时钟 (kHz)")
+set(LTM_BOARD_EXAMPLE_DEFINES POLE_PAIRS=5                     CACHE STRING "例程机型参数（覆盖 POLE_PAIRS 等）")

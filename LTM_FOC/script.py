@@ -43,20 +43,6 @@ def build_sdk(board):
            "-DCMAKE_BUILD_TYPE=Release"]
     return run(cfg) and run(["cmake", "--build", SDK_BUILD])
 
-def sync_example_lib():
-    """产物同步到 examples/basic/lib：例程永远链接最新库，避免旧副本。"""
-    dst = os.path.join(ROOT, "examples", "basic", "lib")
-    if not os.path.isdir(dst):
-        return
-    shutil.copy2(os.path.join(ROOT, "bin", "libLTM_FOC.a"),
-                 os.path.join(dst, "libLTM_FOC.a"))
-    shutil.copytree(os.path.join(ROOT, "bin", "ltm_foc"),
-                    os.path.join(dst, "ltm_foc"), dirs_exist_ok=True)
-    shutil.copy2(os.path.join(ROOT, "src", "common", "lt_motor_types.h"),
-                 os.path.join(dst, "ltm_foc", "lt_motor_types.h"))
-    print("[OK] 已同步 -> examples/basic/lib/")
-
-
 def main():
     ap = argparse.ArgumentParser(description="LTM_FOC SDK 一键构建")
     g = ap.add_mutually_exclusive_group()
@@ -78,7 +64,6 @@ def main():
     if not build_sdk(args.board):
         sys.exit("[FAIL] LTM_FOC 构建失败")
     print("[OK] 产物 -> bin/libLTM_FOC.a + bin/ltm_foc/")
-    sync_example_lib()
 
 if __name__ == "__main__":
     main()

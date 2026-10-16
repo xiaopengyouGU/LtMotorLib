@@ -38,15 +38,16 @@ cmake/       共享构建层：三份工具链（arm / riscv / pc）+ 对外头�
 boards/      板级映射：<board>/{board.cmake, user_param_def.h, linker/}
 LTM_CTRL/    算法库：平台无关，可在 PC 上编译、仿真与压测
 LTM_FOC/     控制胶水：构建时并入 LTM_CTRL，输出单头与合并库
-LTM_HAL/     平台驱动包：一个平台一份，随该平台一起交付
-examples/    例程：basic（串口承载 LTM 协议）、canfd（CAN-FD）
+LTM_HAL/     平台驱动包：一个平台一份；示例（全平台共用）在 LTM_HAL/examples
+components/  控制公共源码：FOC（control）/ 数学（math）/ 协议（protocol）
+examples/    应用层例程：basic（串口承载 LTM 协议）、canfd（CAN-FD）
 BootLoader/  IAP / UDS 在线升级：A/B 分区，升级失败可回滚
 python/      上位机辅助脚本（伯德图、SVPWM 对比等）
 ```
 
 ## 平台与板级
 
-- **平台驱动包**：`LTM_HAL/ltm_hal_ra6m4`、`LTM_HAL/ltm_hal_ra8t2_CPU0`，各自提供该平台的 `ltm_hal.h` 与 `libLTM_HAL.a`；接口函数跨平台同名同义，平台相关常量以宏的形式随该平台的头文件给出。
+- **平台驱动包**：`LTM_HAL/ltm_hal_ra6m4`、`LTM_HAL/ltm_hal_stm32g474_rbt3`、`LTM_HAL/ltm_hal_ra8t2_CPU0`，各自提供该平台的 `ltm_hal.h` 与 `libLTM_HAL.a`；接口函数跨平台同名同义，平台相关常量以宏的形式随该平台的头文件给出。
 - **板级映射**：`boards/<board>/board.cmake` 指定该板使用哪个 HAL 包、哪套工具链、哪个链接脚本与哪些 MCU 编译定义；机型参数在 `boards/<board>/user_param_def.h`。
 - 移植一个新平台：新增一份 HAL 平台包 + 在 `boards/` 下新增一份映射，控制代码无需改动。
 
@@ -61,12 +62,17 @@ python LTM_CTRL/script.py -t              # lt_speed 主机侧压测
 # 2) 控制胶水库（按板级参数编译）
 python LTM_FOC/script.py -s --board ra6m4
 
-# 3) 例程（链接 SDK 交付库与板级链接脚本）
-python examples/basic/script.py -b
-python examples/canfd/script.py -b
+# 3) HAL SDK（按平台；顺带构建 LTM_HAL/examples 下的共享例程）
+python LTM_HAL/script.py -s --hal ra6m4
+
+# 4) 应用层例程（链接 SDK 交付库与板级链接脚本，板级用 --board 选）
+python examples/basic/script.py -b --board ra6m4
+python examples/canfd/script.py -b --board ra6m4
 ```
 
 工具链不在 `PATH` 时，用 `-DLTM_ARM_TOOLCHAIN_DIR`、`-DLTM_RISCV_TOOLCHAIN_DIR`、`-DLTM_PC_TOOLCHAIN_DIR` 指定其 `bin` 目录。板级参数未指定时构建会直接报错，不会静默采用默认值。
+
+LTO 链接要求临时目录是纯 ASCII 路径：用户名含中文时把 `TMP` / `TEMP` 指到纯 ASCII 目录，否则 `lto-wrapper` 报 `could not open symbol resolution file`。
 
 ## 设计约定
 

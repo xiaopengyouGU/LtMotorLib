@@ -9,3 +9,5 @@ set(LTM_BOARD_PARAM_H    "${CMAKE_CURRENT_LIST_DIR}/user_param_def.h"       CACH
 set(LTM_BOARD_LINKER     "${LTM_HAL_SDK_DIR}/config/stm32g474rbt3_flash.ld" CACHE FILEPATH "链接脚本")
 set(LTM_BOARD_DEFINES    STM32G474RBT3 STM32G474xx USE_HAL_DRIVER           CACHE STRING   "该板的 MCU 编译定义")
 set(LTM_BOARD_JLINK_DEVICE "STM32G474RB"                                   CACHE STRING   "J-Link device (flash)")
+set(LTM_BOARD_JLINK_SPEED  4000                                          CACHE STRING "J-Link SWD 时钟 (kHz)")
+set(LTM_BOARD_EXAMPLE_DEFINES POLE_PAIRS=10                    CACHE STRING "例程机型参数（覆盖 POLE_PAIRS 等）")

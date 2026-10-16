@@ -1,5 +1,5 @@
 /*
- * LTM_HAL 简单开环例程
+ * LTM_HAL 简单开环例程（LTM_HAL 各平台共用；板级由 boards/<board>/board.cmake 驱动）
  * - 底层：LTM_HAL 静态库（ltm_hal.h）
  * - 通信：LTM 协议（ltm_commut，基于 ltm_uart 接口）
  * - 控制：开环 FOC（Data_Target 下发 Vq 占空比 %，SVPWM 调制）
@@ -22,9 +22,14 @@
 #include "control/foc/lt_foc.h"
 #include "math/basic/lt_math.h"
 
-/* ---- 电机参数 ---- */
-#define POLE_PAIRS           10
-#define ENCODER_ZERO_OFFSET  203609.0f    /* 电角度绝对零点偏置（count）*/
+/* ---- 机型参数：板级可覆盖（boards/<board>/board.cmake 的 LTM_BOARD_EXAMPLE_DEFINES）---- */
+#ifndef POLE_PAIRS
+#define POLE_PAIRS           5             /* 极对数（板级未给定时用此默认值）*/
+#endif
+#define Q15_MAX              32767         /* Q15 能表示的最大值 */
+#ifndef ENCODER_ZERO_OFFSET
+#define ENCODER_ZERO_OFFSET  0.0f          /* 电角度零点 count；0 = 上电预定位实测 */
+#endif
 
 static float   vq_target = 0.0f;          /* 开环 Q 轴电压指令（%，-100~100）*/
 static uint8_t run_flag  = 0;             /* 运行标志 */
@@ -55,28 +60,11 @@ int main(void)
      * 对 5000 次 ADC 扫描取平均作为零点偏置（25kHz ≈ 200ms）。
      * 校准完成前 adc_get_current 返回 0。 */
     ltm_pwm_start();
-    ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+    ltm_pwm_set_dutys(0, 0, 0);
     ltm_delay_ms(200);                   /* 等电流尖峰消除 */
     ltm_adc_calibrate_zero(2500);        /* 2500 次扫描平均 */
     ltm_delay_ms(500);                   /* 等校准完成 */
     ltm_commut_printf("ADC calib done! \r\n");
-
-    /* ---- 调试：打印校准 offset + 停机偏置自检 ---- */
-    float sIa = 0, sIb = 0, sIc = 0;
-    float dIa, dIb, dIc;
-    for (int i = 0; i < 500; i++) {
-        ltm_adc_get_current(&dIa, &dIb, &dIc);
-        sIa += dIa; sIb += dIb; sIc += dIc;
-        ltm_delay_ms(2);
-    }
-    char fbuf[3][16];
-    LT_FTOAT3(fbuf[0], sIa / 500.0f);
-    LT_FTOAT3(fbuf[1], sIb / 500.0f);
-    LT_FTOAT3(fbuf[2], sIc / 500.0f);
-    ltm_commut_printf("standstill mean A: %s A\r\n", fbuf[0]);
-    ltm_commut_printf("standstill mean B: %s A\r\n", fbuf[1]);
-    ltm_commut_printf("standstill mean C: %s A\r\n", fbuf[2]);
-
     /* 开环 FOC：SVPWM 调制 */
     lt_foc_init(FOC_TYPE_SVPWM);
 
@@ -89,11 +77,22 @@ int main(void)
         ltm_enc_update();           /* 定时更新编码器 */
     }
     ltm_commut_printf("Hello Lvtou!!! \n");
-    // /* 预定位操作，获取电角度对应的编码器零点偏置 */
-    // ltm_pwm_set_dutys(0.05, 0, 0);
-    // ltm_delay_ms(200);
-    // int32_t my_offset = ltm_enc_get_count();
-    // ltm_commut_printf("offset = %d \r\n", my_offset);
+    /* 电角度零点：板级给了固定值就直接用（绝对值编码器），否则上电预定位实测一次 */
+    float zero_count;
+    if (ENCODER_ZERO_OFFSET > 0.0f) {
+        zero_count = ENCODER_ZERO_OFFSET;
+    } else {
+        lt_foc_process(0.1f, 0, 0);                     /* D 轴强拖到 0 电角度 */
+        float dA, dB, dC;
+        lt_foc_get_dutys(&dA, &dB, &dC);
+        ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
+        ltm_delay_ms(250);
+        ltm_enc_update();               /* 更新编码器计数值 */
+        zero_count = (float)ltm_enc_get_count();
+        ltm_pwm_set_dutys(0, 0, 0);
+        ltm_delay_ms(50);
+    }
+    ltm_commut_printf("zero offset = %d\r\n", (int)zero_count);
 
     while(1)
     {
@@ -102,19 +101,20 @@ int main(void)
             user_func(data_type, data, data_len);
         }
         ltm_enc_update();           /* 定时更新编码器 */
-        /* 开环控制：编码器电角度 → SVPWM → 三相占空比 */
-        if(run_flag){
+         /* 开环控制：编码器电角度 → SVPWM → 三相占空比 */
+        if (run_flag) {
             float enc = (float)ltm_enc_get_count();
-            float the = (enc - ENCODER_ZERO_OFFSET) * LTM_ENC_RAD_PER_COUNT * POLE_PAIRS;
+            float the = (enc - zero_count) * LTM_ENC_RAD_PER_COUNT * POLE_PAIRS;
             the = lt_normalize(the);
             lt_foc_process(0.0f, vq_target * 0.01f, the);
             float dA, dB, dC;
             lt_foc_get_dutys(&dA, &dB, &dC);
-            ltm_pwm_set_dutys(dA, dB, dC);
+            ltm_pwm_set_dutys(dA * Q15_MAX, dB * Q15_MAX, dC * Q15_MAX);
             ltm_led_set(LTM_LED_STOP, 0);
             ltm_led_set(LTM_LED_RUN, 1);
-        }else{
-            ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+        } else {
+            // ltm_pwm_set_dutys(0.16f * Q15_MAX, 0.37f * Q15_MAX, 0.82f * Q15_MAX);
+            ltm_pwm_set_dutys(0, 0, 0);
             ltm_led_set(LTM_LED_STOP, 1);
             ltm_led_set(LTM_LED_RUN, 0);
         }
@@ -123,19 +123,22 @@ int main(void)
             uint8_t tx_buf[16] = {0x11,0x22,0x33,0x44,0x56,0x78,0x90,0xAB,0xCD};
             ltm_canfd_send(id, tx_buf, 16);
         }
-        /* 5 条曲线：A/B/C 相电流、母线电压、机械角度 */
-        float Ia, Ib, Ic, vbus;
+        /* 7 条曲线：A/B/C 相电流、母线电压、驱动板温度、电机温度、机械角度 */
+        int32_t Ia, Ib, Ic, vbus, temp_drv, temp_mot;
         ltm_adc_get_current(&Ia, &Ib, &Ic);
         ltm_adc_get_vbus(&vbus);
-        curves.size = 5;
-        curves.values[0] = Ia;
-        curves.values[1] = Ib;
-        curves.values[2] = Ic;
-        curves.values[3] = vbus;
-        curves.values[4] = (float)ltm_enc_get_position() * (360.0f / LTM_ENC_CPR);
+        ltm_adc_get_temp(&temp_mot, &temp_drv);
+        curves.size = 7;
+        curves.values[0] = Ia   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[1] = Ib   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[2] = Ic   * LTM_ADC_CURRENT_PER_COUNT;
+        curves.values[3] = vbus * LTM_ADC_VOLTAGE_PER_COUNT;
+        curves.values[4] = temp_drv * LTM_ADC_TEMP_PER_COUNT;
+        curves.values[5] = temp_mot * LTM_ADC_TEMP_PER_COUNT;
+        curves.values[6] = ltm_enc_get_position() * LTM_ENC_ANGLE_PER_COUNT;
         ltm_commut_send_curves(&curves);
 
-        ltm_delay_ms(2);
+        ltm_delay_us(500);
         count++;
     }
 }
@@ -170,7 +173,7 @@ void user_func(uint8_t data_type, uint8_t *buf, uint16_t len)
             break;
         case Data_CMD_Stop:
             run_flag = 0;
-            ltm_pwm_set_dutys(0.0f, 0.0f, 0.0f);
+            ltm_pwm_set_dutys(0, 0, 0);
             ltm_pwm_stop();
             ltm_commut_printf("Stop\n");
             ltm_commut_send(Data_CMD_Stop, &run_flag, 1);

@@ -129,12 +129,8 @@ cmake --build D:/Develop/LtMotorLib/LTM_CTRL/build_hpm
 # 2. 构建 LTM_FOC SDK（自动 merge LTM_CTRL 到 bin/libLTM_FOC.a）
 python script.py -s
 
-# 3. 同步库到头文件到 basic 例程
-copy bin/libLTM_FOC.a examples/basic/lib/
-copy bin/ltm_foc/lt_motor.h examples/basic/lib/ltm_foc/
-
-# 4. 链接 basic 例程
-cmake --build examples/basic/build
+# 3. 构建 basic 例程（直接链 bin/libLTM_FOC.a，不需要同步副本）
+python examples/basic/script.py -b --board ra6m4
 
 # 5. J-Link 烧录
 JLink.exe tmp_jlink/flash_joint_basic.jlink

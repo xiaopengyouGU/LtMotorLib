@@ -4,11 +4,13 @@
 LTM_HAL SDK 一键构建脚本（LTM_HAL 下所有平台共用这一份）
 
 - 构建指定平台的静态库：bin/libLTM_HAL.a + bin/ltm_hal/ltm_hal.h（bin/v<版本>/ 留档）
-- 构建成功后同步该平台 examples/*/lib/，并依次执行各例程的 python script.py -b
+- 版本号唯一出处：该平台 CMakeLists.txt 的 project(LTM_HAL VERSION x.y.z)
+- 构建成功后依次构建共享例程 LTM_HAL/examples/*（板级由 --board 指定，默认按平台映射）
 - 平台目录名 ltm_hal_<平台>；--hal 收短名（ra6m4）也收全名（ltm_hal_ra6m4）
 
 用法:
-  python LTM_HAL/script.py -s --hal ra6m4                # 构建 SDK + 同步 lib/ + 构建全部例程
+  python LTM_HAL/script.py -s --hal ra6m4                # 构建 SDK + 共享例程（板级 ra6m4）
+  python LTM_HAL/script.py -s --hal ra6m4 --board ra6m4  # 显式指定例程板级
   python LTM_HAL/script.py -s --hal ra6m4 --no-examples   # 只构建 SDK
   python LTM_HAL/script.py -s --hal ra6m4 -v 1.0.3        # 指定版本号
   python LTM_HAL/script.py -c --hal ra6m4                 # 清理该平台 build 目录
@@ -29,13 +31,19 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 HAL_ROOT  = os.path.dirname(os.path.abspath(__file__))
+EXAMPLES  = os.path.join(HAL_ROOT, "examples")   # 例程统一放 LTM_HAL/examples（全平台共用）
 GENERATOR = "MinGW Makefiles"   # keep consistent with examples; auto-clean on mismatch
 
-# 各平台默认版本号（沿用拆分前各 script.py 的默认值）；未登记的平台读 CMakeLists 的 project 版本
-DEFAULT_VERSION = {
-    "ltm_hal_ra6m4":          "1.0.2",
-    "ltm_hal_ra8t2_CPU0":     "1.0.2",
-    "ltm_hal_stm32g474_rbt3": "1.0.0",
+# 平台目录 -> 例程默认板级（boards/<board>）
+HAL_BOARD = {
+    "ltm_hal_ra6m4":          "ra6m4",
+    "ltm_hal_stm32g474_rbt3": "stm32g474",
+    "ltm_hal_ra8t2_CPU0":     "ra8t2",
+}
+
+# 共享例程按 Q15 接口写；仍是浮点接口的平台暂时不做例程
+HAL_NO_EXAMPLES = {
+    "ltm_hal_ra8t2_CPU0": "HAL 仍是浮点接口（未对齐 Q15），共享例程暂不支持",
 }
 
 
@@ -61,17 +69,15 @@ def resolve_hal(name):
 
 
 def default_version(hal_dir):
-    """默认版本号：登记过的平台用 DEFAULT_VERSION，其余读 CMakeLists 的 project(LTM_HAL VERSION x.y.z)"""
-    name = os.path.basename(hal_dir)
-    if name in DEFAULT_VERSION:
-        return DEFAULT_VERSION[name]
+    """版本号唯一出处：该平台 CMakeLists.txt 的 project(LTM_HAL VERSION x.y.z)"""
     with open(os.path.join(hal_dir, "CMakeLists.txt"), "r", errors="ignore") as f:
         for line in f:
             if line.startswith("project(LTM_HAL"):
                 item = line.split()
                 if "VERSION" in item:
                     return item[item.index("VERSION") + 1]
-    return "1.0.0"
+    sys.exit("[FAIL] %s 的 CMakeLists.txt 缺少 project(LTM_HAL VERSION x.y.z)"
+             % os.path.basename(hal_dir))
 
 
 def ensure_cache(dirpath, source, generator):
@@ -105,43 +111,32 @@ def build_sdk(hal_dir, build_dir, version):
     return run(cfg) and run(["cmake", "--build", build_dir])
 
 
-def iter_examples(hal_dir):
-    """<平台>/examples 下所有含 script.py 的例程（按名字排序）"""
-    ex_dir = os.path.join(hal_dir, "examples")
-    if not os.path.isdir(ex_dir):
+def iter_examples():
+    """LTM_HAL/examples 下所有含 script.py 的例程（按名字排序）"""
+    if not os.path.isdir(EXAMPLES):
         return []
-    return [os.path.join(ex_dir, n) for n in sorted(os.listdir(ex_dir))
-            if os.path.isfile(os.path.join(ex_dir, n, "script.py"))]
+    return [os.path.join(EXAMPLES, n) for n in sorted(os.listdir(EXAMPLES))
+            if os.path.isfile(os.path.join(EXAMPLES, n, "script.py"))]
 
 
-def sync_lib(example_dir, hal_dir):
-    """把 SDK 产物拷进例程 lib/：libLTM_HAL.a + ltm_hal/ltm_hal.h"""
-    lib = os.path.join(example_dir, "lib")
-    os.makedirs(os.path.join(lib, "ltm_hal"), exist_ok=True)
-    shutil.copy2(os.path.join(hal_dir, "bin", "libLTM_HAL.a"),
-                 os.path.join(lib, "libLTM_HAL.a"))
-    shutil.copy2(os.path.join(hal_dir, "bin", "ltm_hal", "ltm_hal.h"),
-                 os.path.join(lib, "ltm_hal", "ltm_hal.h"))
-
-
-def build_example(example_dir):
-    """在例程目录里执行 python script.py -b"""
+def build_example(example_dir, board):
+    """在例程目录里执行 python script.py -b --board <board>"""
     name = os.path.basename(example_dir)
-    print(f">>> [{name}] {sys.executable} script.py -b   (cwd={example_dir})")
-    return subprocess.run([sys.executable, "script.py", "-b"], cwd=example_dir).returncode == 0
+    print(f">>> [{name}] {sys.executable} script.py -b --board {board}   (cwd={example_dir})")
+    return subprocess.run([sys.executable, "script.py", "-b", "--board", board],
+                          cwd=example_dir).returncode == 0
 
 
-def build_all_examples(hal_dir):
-    exs = iter_examples(hal_dir)
+def build_all_examples(board):
+    exs = iter_examples()
     if not exs:
-        print("[skip] 该平台 examples/ 下没有可构建的例程")
+        print("[skip] LTM_HAL/examples 下没有可构建的例程")
         return True
-    print(f"[2/2] 同步 lib/ 并构建 {len(exs)} 个例程 ...")
+    print(f"[2/2] 构建 {len(exs)} 个共享例程（板级 {board}） ...")
     for i, ex in enumerate(exs, 1):
         name = os.path.basename(ex)
-        sync_lib(ex, hal_dir)
-        print(f"[{i}/{len(exs)}] {name}: lib/ <- bin/ 已同步")
-        if not build_example(ex):
+        print(f"[{i}/{len(exs)}] {name}")
+        if not build_example(ex, board):
             print(f"[FAIL] 例程 {name} 构建失败")
             return False
     print("[OK] 全部例程构建完成")
@@ -154,8 +149,11 @@ def main():
     g.add_argument("-s", "--sdk", action="store_true", help="构建 LTM_HAL 静态库")
     g.add_argument("-c", "--clean", action="store_true", help="清理该平台的 build 目录")
     ap.add_argument("--hal", help="平台名：短名 ra6m4 或目录名 ltm_hal_ra6m4")
-    ap.add_argument("-v", "--version", default=None, help="LTM_HAL 版本号（默认取该平台的默认版本）")
-    ap.add_argument("--no-examples", action="store_true", help="只构建 SDK，不同步/不构建 examples")
+    ap.add_argument("-v", "--version", default=None,
+                    help="LTM_HAL 版本号（默认取该平台 CMakeLists 的 project 版本）")
+    ap.add_argument("--board", default=None,
+                    help="例程板级（boards/<board>），默认按平台映射（如 ra6m4 -> ra6m4）")
+    ap.add_argument("--no-examples", action="store_true", help="只构建 SDK，不构建 examples")
     ap.add_argument("--list", action="store_true", help="列出可用平台")
     args = ap.parse_args()
 
@@ -171,6 +169,7 @@ def main():
     hal_dir   = resolve_hal(args.hal)
     name      = os.path.basename(hal_dir)
     build_dir = os.path.join(hal_dir, "build")
+    board     = args.board or HAL_BOARD.get(name, name)
 
     if args.clean:
         if os.path.isdir(build_dir):
@@ -190,9 +189,12 @@ def main():
     print(f"[OK] 产物 -> bin/libLTM_HAL.a + bin/v{version}/")
 
     if args.no_examples:
-        print("[skip] --no-examples：跳过 examples 的同步与构建")
+        print("[skip] --no-examples：跳过 examples 的构建")
         return
-    if not build_all_examples(hal_dir):
+    if name in HAL_NO_EXAMPLES:
+        print("[skip] %s：%s" % (name, HAL_NO_EXAMPLES[name]))
+        return
+    if not build_all_examples(board):
         sys.exit("[FAIL] 例程构建失败")
 
 

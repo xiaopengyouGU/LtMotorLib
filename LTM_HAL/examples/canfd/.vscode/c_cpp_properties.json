@@ -5,7 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/src",
                 "../../../components",
-                "${workspaceFolder}/lib"
+                "../../../LTM_HAL/ltm_hal_ra6m4/bin"
             ],
             "defines": [
                 "_RENESAS_RA_",

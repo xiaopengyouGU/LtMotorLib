@@ -7,13 +7,13 @@
 
 | 层 | 产物 | 职责 |
 | :--- | :--- | :--- |
-| LTM_HAL | `lib/libLTM_HAL.a` + `lib/ltm_hal/ltm_hal.h` | 外设驱动：PWM/ADC/编码器/CAN-FD/UART/LED |
+| LTM_HAL | `${LTM_HAL_SDK_DIR}/bin`（板级映射 boards/<board> 指定） | 外设驱动：PWM/ADC/编码器/CAN-FD/UART/LED |
 | LTM_CTRL | （已合并进 libLTM_FOC.a） | 控制算法：FOC/PID/测速/死区补偿等 |
-| LTM_FOC | `lib/libLTM_FOC.a` + `lib/ltm_foc/lt_motor.h` | 胶水层：状态机 + 25kHz 三环调度 + 一键初始化 |
+| LTM_FOC | `LTM_FOC/bin/libLTM_FOC.a` + `LTM_FOC/bin/ltm_foc/lt_motor.h` | 胶水层：状态机 + 25kHz 三环调度 + 一键初始化 |
 | App | `src/main.c` + `components/protocol/` | 协议解析、命令分发、曲线上报 |
 
 > `libLTM_FOC.a` 在 SDK 构建期已把 `LTM_CTRL` 合并进去，应用侧只需链接 `libLTM_FOC.a + libLTM_HAL.a`，
-> 不会出现重复定义。换平台时只需替换 `lib/` 目录内容。
+> 不会出现重复定义。换平台只改 `--board`，HAL 包与链接脚本由板级映射给出。
 
 ## 快速开始
 
@@ -56,13 +56,7 @@ python script.py -R    # 构建 + J-Link 烧录
 
 ```
 canfd/
-├── lib/                  # SDK 产物（换平台只改这里）
-│   ├── libLTM_HAL.a
-│   ├── libLTM_FOC.a      # 已内含 LTM_CTRL
-│   ├── ltm_hal/ltm_hal.h
-│   └── ltm_foc/lt_motor.h
-├── linker/               # 链接脚本（App 运行区 0x02008000）
-├── src/
+├── src/                  # SDK（HAL 包 + LTM_FOC/bin）与链接脚本由 board.cmake 给出，例程不自备
 │   ├── main.c            # 应用层：协议 + 命令分发 + 上报
 │   ├── protocol/         # LTM 协议（ltm_commut + protocol）
 │   └── util/lt_str.h     # 简易浮点转字符串
