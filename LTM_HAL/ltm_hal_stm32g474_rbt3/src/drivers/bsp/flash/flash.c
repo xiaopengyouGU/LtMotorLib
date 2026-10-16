@@ -3,7 +3,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 片内 Flash（页擦除 2KB，64bit 双字编程）
- *                             与 HPM XPI NOR 版接口保持一致（地址基于 0x08000000）
+ *                             接口与其它平台保持一致（地址基于 0x08000000）
  * 2026-09-02     Lvtou        BOOT0 来源切换：PB8/BOOT0 引脚 -> nBOOT0 选项位，释放 PB8 给 FDCAN1_RX
  */
 #include "bsp/flash/flash.h"

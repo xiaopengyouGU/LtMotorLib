@@ -104,6 +104,12 @@ void    ltm_canfd_filter_disable(void)         { canfd_filter_disable(); }
 /*==================== Flash ====================*/
 /* 片内 code flash 只读：片内 flash 直接寻址访问，memcpy 即可。
  * 齿槽表由 JLink 写在 flash 0x80024000，固件上电时读进 RAM 重建表。*/
+/* 占位：本平台不提供片内 flash 写/擦，扇区大小无意义，返回 0（未实现）*/
+uint32_t ltm_flash_get_sector_size(void)
+{
+    return 0;
+}
+
 int ltm_flash_read(uint32_t addr, uint8_t *buf, uint32_t len)
 {
     if (!buf || !len) return -1;

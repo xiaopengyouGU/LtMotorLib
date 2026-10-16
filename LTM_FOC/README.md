@@ -1,11 +1,11 @@
-# LTM_FOC（HPM6E8Y Joint 关节板）
+# LTM_FOC（控制胶水层）
 
 胶水层 SDK：LTM_HAL（底层驱动）+ LTM_CTRL（控制算法，已合并进 `libLTM_FOC.a`）+ LTM_FOC（状态机 + 三环调度 + 电机 API）。
 
-- 平台：HPM6E8Y（RISC-V rv32imafc，200MHz PWM，浮点硬件）
-- 电机：14 对极、100W 关节电机，MT6701 14bit 绝对值编码器（16384 CPR）
-- 频率分配：电流环 20kHz / 速度环 2kHz / 位置环 1kHz（三环级联分频，同一 ADC 中断内串行执行）
-- App 固定链接运行区 `0x02008000`，配合 BootLoader 运行区 + 备份区升级模型
+- 平台：按板级编译（`--board ra6m4` / `--board stm32g474`），HAL 包、工具链、链接脚本、机型参数全部来自 `boards/<board>/`；
+- 交付：`bin/libLTM_FOC.a`（已内含 LTM_CTRL）+ `bin/ltm_foc/lt_motor.h`；
+- 频率分配：电流环 20kHz / 速度环 4kHz / 位置环 1kHz（三环级联分频，同一 ADC 中断内串行执行）；
+- App 运行区由板级链接脚本决定（ra6m4 `0x00008000`、g474 Flash `0x08000000`），可配合 BootLoader 运行区 + 备份区升级模型。
 
 ---
 
@@ -109,48 +109,45 @@ PLL 参数整定轨迹：178Hz（噪声大）→ 100Hz（震）→ 50Hz（平滑
 
 | 指令 | 含义 |
 | :--- | :--- |
-| `Te=xx` | 力矩模式，目标 Q 轴电流（A） |
-| `V=xx` | 斜坡速度模式，目标转速（RPM） |
-| `P=xx` | 位置模式，绝对角度（°） |
-| `CC=1` | 齿槽辨识武装（Start 后自动辨识→停机） |
-| `Start` / `Stop` | 使能运行 / 停机失能 |
-| `Reset` | 软复位回 BootLoader（6s 升级窗口） |
+| `T=<A>` | 转矩模式，目标 Q 轴电流（A） |
+| `RT=<A>` | 斜坡转矩模式（斜率在 `boards/<board>/user_param_def.h`） |
+| `V=<RPM>` | 速度模式，目标转速（RPM） |
+| `RV=<RPM>` | 斜坡速度模式 |
+| `P=<deg>` | 位置模式，绝对角度（°） |
+| `S` / `ES` | 受控停机（1500 RPM/s）/ 急停（6000 RPM/s） |
+| `H` / `?` | 帮助 |
 
-模式切换仅允许在 Idle（停机失能）状态，运行中切换会被拒绝。
+模式切换只在非运行态允许（Idle / Stop），运行中切换会被拒绝。
 
 ---
 
 ## 构建与烧录
 
 ```bash
-# 1. 构建 LTM_CTRL（hpm6e8y）
-cmake --build D:/Develop/LtMotorLib/LTM_CTRL/build_hpm
+# 1. 构建 LTM_FOC SDK（按板级机型参数编译，自动并入 LTM_CTRL 对象）
+python LTM_FOC/script.py -s --board ra6m4
 
-# 2. 构建 LTM_FOC SDK（自动 merge LTM_CTRL 到 bin/libLTM_FOC.a）
-python script.py -s
-
-# 3. 构建 basic 例程（直接链 bin/libLTM_FOC.a，不需要同步副本）
+# 2. 应用层例程（直接链 bin/libLTM_FOC.a 与板级 HAL 包，不需要同步副本）
 python examples/basic/script.py -b --board ra6m4
+python examples/canfd/script.py -b --board ra6m4
 
-# 5. J-Link 烧录
-JLink.exe tmp_jlink/flash_joint_basic.jlink
+# 3. 构建 + J-Link 烧录（器件名与 SWD 时钟取自 boards/<board>/board.cmake）
+python examples/basic/script.py -R --board ra6m4
 ```
 
-> 修改 LTM_CTRL 后，LTM_FOC 需 touch 任一源文件触发重新 merge。
+> 改了 `LTM_CTRL` 源码后要重编 LTM_FOC SDK，`bin/libLTM_FOC.a` 才会带上新的算法对象。
 
 ## 目录结构
 
 ```
-ltm_foc_hpm6e8y_Joint/
-├─ src/ltm_foc/
-│  ├─ common/tasks_param_def.h   # 控制参数集中定义
-│  ├─ motor/lt_motor.c           # 电机 API（init/enable/run/set/cmd）
-│  ├─ tasks/control_tasks.c      # 三环调度 + 位置规划 + 到位处理
-│  ├─ tasks/calib_task.c         # 电角度零点自校准
-│  ├─ tasks/ident_task.c         # 齿槽辨识 + 固化表加载
-│  └─ schedule/lt_fsm.c          # 状态机
-├─ examples/basic/               # 串口 basic 例程（Te/V/P/CC 指令）
-├─ examples/canfd/               # CAN-FD 例程
-├─ bin/                          # libLTM_FOC.a + 合并的 LTM_CTRL
-└─ script.py                     # SDK 一键构建
+LTM_FOC/
+├─ src/
+│  ├─ common/     # 机型参数与类型（tasks_param_def.h / lt_motor_types.h / tasks_types.h）
+│  ├─ motor/      # 电机 API（lt_motor.c/h）
+│  ├─ tasks/      # 三环调度与任务（control_tasks / calib_task / driver_task）
+│  └─ schedule/   # 状态机（lt_fsm.c）
+├─ bin/           # libLTM_FOC.a（已内含 LTM_CTRL）+ ltm_foc/lt_motor.h
+└─ script.py      # 按板级一键构建
 ```
+
+应用层例程在仓库根 `examples/`（basic / canfd），公共源码在 `components/`。

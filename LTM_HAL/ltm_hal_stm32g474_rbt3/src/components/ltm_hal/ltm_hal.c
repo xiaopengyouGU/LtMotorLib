@@ -1,7 +1,6 @@
 /*
  * Change Logs:
  * Date           Author       Notes
- * 2026-08-22     Lvtou        LTM_HAL —— HPM6E8Y（HPM6E00 SiP PMSM 关节板）
  * 2026-09-01     Lvtou        LTM_HAL —— STM32G474RCT6（迁移：API 不变，底层换 STM32 HAL）
  * 2026-09-19     Lvtou        STM32G474RBT3版本驱动迁移       
  */
@@ -80,8 +79,6 @@ void ltm_adc_set_callback(void (*callback)(void)) { adc_set_callback(callback); 
 void     ltm_enc_update(void)        { encoder_update(); }
 uint32_t ltm_enc_get_count(void)     { return encoder_get_count(); }
 int64_t  ltm_enc_get_position(void)  { return encoder_get_position(); }
-float    ltm_enc_get_angle_deg(void) { return encoder_get_angle_deg(); }
-float    ltm_enc_get_angle_rad(void) { return encoder_get_angle_rad(); }
 void     ltm_enc_set_zero(void)      { encoder_set_zero(); }
 
 /*==================== LED ====================*/

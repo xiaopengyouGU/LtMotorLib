@@ -38,8 +38,6 @@
 #define ENCODER_CPR_HALF            131072          /* 编码器一半的分辨率（用于半圈法圈数更新）*/
 #define ENCODER_CPR_F               262144.0f       /* 编码器分辨率（18位） */
 /* 角度转换系数（预计算，18位编码器） */
-#define ENCODER_DEG_PER_COUNT       0.0013733f      /* 360.0f/ ENCODER_CPR */
-#define ENCODER_RAD_PER_COUNT       2.39674e-5f     /* 2PI   / ENCODER_CPR */ 
 
 /* ---- 上电同步采样 ------------------------------------------------------- */
 #define STARTUP_SYNC_SAMPLES         8U
@@ -53,8 +51,6 @@ void encoder_init(void);
 void encoder_update(void);                          /* 手动更新编码器计数（高频调用）*/              
 uint32_t encoder_get_count(void);                   /* 获取当前计数值（0~ENCODER_CPR-1）*/
 int64_t  encoder_get_position(void);                /* 获取累计位置（计数值，可跨圈） */
-float encoder_get_angle_deg(void);                  /* 获取机械角度（度）*/
-float encoder_get_angle_rad(void);                  /* 获取机械角度（弧度）*/
 void encoder_set_zero(void);                        /* 软归零（清零硬件计数器和圈数） */
 
 #endif /* _ENCODER_H_ */

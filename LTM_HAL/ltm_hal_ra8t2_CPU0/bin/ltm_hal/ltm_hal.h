@@ -62,8 +62,6 @@ void ltm_adc_set_callback(void (*callback)(void));
 void     ltm_enc_update(void);
 uint32_t ltm_enc_get_count(void);
 int64_t  ltm_enc_get_position(void);
-float    ltm_enc_get_angle_deg(void);
-float    ltm_enc_get_angle_rad(void);
 void     ltm_enc_set_zero(void);
 
 /*==================== LED ====================*/
@@ -79,5 +77,9 @@ void    ltm_canfd_filter_add(uint16_t id);      /* CAN-FD 软件白名单 */
 void    ltm_canfd_filter_clear(void);
 void    ltm_canfd_filter_enable(void);
 void    ltm_canfd_filter_disable(void);
+
+/*==================== Flash ====================*/
+/* 占位接口：本平台暂无片内 flash 访问层，仅为与其它平台同名同义，返回 0（未实现）*/
+uint32_t ltm_flash_get_sector_size(void);
 
 #endif /* LTM_HAL_H */

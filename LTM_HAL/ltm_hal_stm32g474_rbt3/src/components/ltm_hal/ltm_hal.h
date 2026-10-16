@@ -61,8 +61,6 @@ void ltm_adc_set_callback(void (*callback)(void));
 void     ltm_enc_update(void);
 uint32_t ltm_enc_get_count(void);
 int64_t  ltm_enc_get_position(void);
-float    ltm_enc_get_angle_deg(void);
-float    ltm_enc_get_angle_rad(void);
 void     ltm_enc_set_zero(void);
 
 /*==================== LED ====================*/

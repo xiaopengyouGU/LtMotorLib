@@ -133,16 +133,6 @@ int64_t  encoder_get_position(void)                 /* 获取累计位置（计�
     return (int64_t)config->count + ENCODER_CPR * (int64_t)config->circle_count;
 }
 
-float encoder_get_angle_deg(void)                  /* 获取机械角度（度） */
-{
-    return (float)encoder_get_position() * ENCODER_DEG_PER_COUNT; 
-}
-
-float encoder_get_angle_rad(void)                  /* 获取机械角度（弧度） */
-{
-    return (float)encoder_get_position() * ENCODER_RAD_PER_COUNT;
-}
-
 void encoder_set_zero(void)                        /* 软归零（清零硬件计数器和圈数） */
 {
     for(int i = 0; i < 2; i++){

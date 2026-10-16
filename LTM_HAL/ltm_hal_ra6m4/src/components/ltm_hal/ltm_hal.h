@@ -79,6 +79,7 @@ void    ltm_canfd_filter_disable(void);
 /*==================== Flash ====================*/
 /* 片内 flash 读/写/擦，地址与长度都按字节；返回 0 成功、非 0 失败。
  * RA6M4 只实现读（直接寻址 memcpy）；写/擦返回失败，齿槽表由 JLink 写入 flash。*/
+uint32_t ltm_flash_get_sector_size(void);  /* 扇区大小（字节）；本平台未实现，返回 0 */
 int ltm_flash_read(uint32_t addr, uint8_t *buf, uint32_t len);
 int ltm_flash_write(uint32_t addr, const uint8_t *buf, uint32_t len);
 int ltm_flash_erase(uint32_t addr, uint32_t len);

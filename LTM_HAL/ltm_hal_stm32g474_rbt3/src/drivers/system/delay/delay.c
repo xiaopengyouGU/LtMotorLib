@@ -27,7 +27,7 @@ void delay_us(uint32_t us)
 
 void delay_ms(uint16_t ms)
 {
-    /* 基于系统时基死等（与 HPM 版同款），只比较低 32 位差值（ms 级不会回绕） */
+    /* 基于系统时基死等，只比较低 32 位差值（ms 级不会回绕） */
     volatile uint64_t start = system_get_tick();
     while ((uint32_t)(system_get_tick() - start) < (uint32_t)ms) { ; }
 }

@@ -107,7 +107,7 @@ void system_set_callback(void (*callback)(void))
 void system_reset(void)
 {
     /* 软复位前手动关闭所有外设：内核复位不覆盖外设域，
-     * 外设保留运行状态会导致 App 重新初始化冲突（与 HPM 版同思路） */
+     * 外设保留运行状态会导致 App 重新初始化冲突 */
     __disable_irq();
 
     /* PWM：停 TIM1 计数器、关输出（MOE 清 0 -> 输出进入 idle 低电平） */

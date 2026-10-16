@@ -4,7 +4,7 @@
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 双 MT6835 SPI 编码器快照读取（SPI1 + SPI3）
  *
- * 时序契约（与 HPM 版一致，一拍补偿）：
+ * 时序契约（一拍补偿）：
  *   - 每 PWM 周期一次短事务（5×16bit @5.31MHz，≈9.0µs），其余时间总线完全空闲
  *   - 事务由 ADC JEOS 中断在电流拷贝后统一发起（spi_kick_all），非阻塞 DMA
  * 2026-09-02     Lvtou        SPI 降速至 5.31MHz（DIV32）留裕量，事务 ~9.0µs；

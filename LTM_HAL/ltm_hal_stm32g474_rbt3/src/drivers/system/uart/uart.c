@@ -3,7 +3,7 @@
  * Change Logs:
  * Date           Author       Notes
  * 2026-09-01     Lvtou        STM32G474 调试串口 USART3（PC10/PC11，115200）
- *                             中断接收（批量上交）+ 阻塞发送，与 HPM uart.c 同构
+ *                             中断接收（批量上交）+ 阻塞发送
  */
 #include "system/uart/uart.h"
 #include "stm32g4xx_hal.h"

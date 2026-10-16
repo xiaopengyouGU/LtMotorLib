@@ -82,8 +82,6 @@ void ltm_adc_set_callback(void (*callback)(void)) { adc_set_callback(callback); 
 void     ltm_enc_update(void)        { encoder_update(); }
 uint32_t ltm_enc_get_count(void)     { return encoder_get_count(); }
 int64_t  ltm_enc_get_position(void)  { return encoder_get_position(); }
-float    ltm_enc_get_angle_deg(void) { return encoder_get_angle_deg(); }
-float    ltm_enc_get_angle_rad(void) { return encoder_get_angle_rad(); }
 void     ltm_enc_set_zero(void)      { encoder_set_zero(); }
 
 /*==================== LED ====================*/
@@ -99,3 +97,10 @@ void    ltm_canfd_filter_add(uint16_t id)      { canfd_filter_add(id); }
 void    ltm_canfd_filter_clear(void)           { canfd_filter_clear(); }
 void    ltm_canfd_filter_enable(void)          { canfd_filter_enable(); }
 void    ltm_canfd_filter_disable(void)         { canfd_filter_disable(); }
+
+/*==================== Flash ====================*/
+/* 占位：本平台暂无片内 flash 访问层，扇区大小无意义，返回 0（未实现）*/
+uint32_t ltm_flash_get_sector_size(void)
+{
+    return 0;
+}
