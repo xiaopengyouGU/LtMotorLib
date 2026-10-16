@@ -1,15 +1,20 @@
 {
     "configurations": [
         {
-            "name": "RISC-V-HPM6E8Y-LTM_FOC-Basic",
+            "name": "ARM-GCC-ra6m4-LTM_FOC-Basic",
             "includePath": [
                 "${workspaceFolder}/src",
                 "../../components",
-                "${workspaceFolder}/lib/**"
+                "${workspaceFolder}/../../LTM_FOC/bin",
+                "${workspaceFolder}/../../LTM_HAL/ltm_hal_ra6m4/bin"
             ],
-            "defines": [],
-            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/RISC-V_GUN_Tool_Chain/rv32imac_zicsr_zifencei_multilib_b_ext-win/bin/riscv32-unknown-elf-gcc.exe",
-            "cStandard": "gnu99",
+            "defines": [
+                "_RENESAS_RA_",
+                "_RA_CORE=CM33",
+                "_RA_ORDINAL=1"
+            ],
+            "compilerPath": "D:/GoodThing/HPM_SDK_Develop/Arm_GNU_Tool_Chain/bin/arm-none-eabi-gcc.exe",
+            "cStandard": "gnu11",
             "cppStandard": "c++11",
             "intelliSenseMode": "gcc-arm"
         }

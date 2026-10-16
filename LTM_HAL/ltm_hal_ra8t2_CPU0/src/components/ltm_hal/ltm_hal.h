@@ -79,7 +79,11 @@ void    ltm_canfd_filter_enable(void);
 void    ltm_canfd_filter_disable(void);
 
 /*==================== Flash ====================*/
-/* 占位接口：本平台暂无片内 flash 访问层，仅为与其它平台同名同义，返回 0（未实现）*/
+/* 占位接口：本平台暂无片内 flash 访问层，仅为与其它平台同名同义；
+ * 读/写/擦返回 -1（失败），扇区大小返回 0。真实现应包一层 r_mram 驱动。*/
 uint32_t ltm_flash_get_sector_size(void);
+int      ltm_flash_read(uint32_t addr, uint8_t *buf, uint32_t len);
+int      ltm_flash_write(uint32_t addr, const uint8_t *data, uint32_t len);
+int      ltm_flash_erase(uint32_t addr, uint32_t size);
 
 #endif /* LTM_HAL_H */

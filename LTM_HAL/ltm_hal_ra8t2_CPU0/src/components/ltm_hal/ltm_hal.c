@@ -99,8 +99,26 @@ void    ltm_canfd_filter_enable(void)          { canfd_filter_enable(); }
 void    ltm_canfd_filter_disable(void)         { canfd_filter_disable(); }
 
 /*==================== Flash ====================*/
-/* 占位：本平台暂无片内 flash 访问层，扇区大小无意义，返回 0（未实现）*/
+/* 占位：本平台暂无片内 flash 访问层；读/写/擦返回失败，扇区大小返回 0（未实现）*/
 uint32_t ltm_flash_get_sector_size(void)
 {
     return 0;
+}
+
+int ltm_flash_read(uint32_t addr, uint8_t *buf, uint32_t len)
+{
+    (void)addr; (void)buf; (void)len;
+    return -1;
+}
+
+int ltm_flash_write(uint32_t addr, const uint8_t *data, uint32_t len)
+{
+    (void)addr; (void)data; (void)len;
+    return -1;
+}
+
+int ltm_flash_erase(uint32_t addr, uint32_t size)
+{
+    (void)addr; (void)size;
+    return -1;
 }

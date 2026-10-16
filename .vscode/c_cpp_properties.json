@@ -31,7 +31,10 @@
                 "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/inc/api",
                 "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/inc/instances",
                 "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/fsp/src/bsp/cmsis/Device/RENESAS/Include",
-                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/arm/CMSIS_6/CMSIS/Core/Include"
+                "${workspaceFolder}/LTM_HAL/ltm_hal_ra6m4/config/foc_driver/ra/arm/CMSIS_6/CMSIS/Core/Include",
+                "${workspaceFolder}/components",
+                "${workspaceFolder}/LTM_HAL/examples/basic/src",
+                "${workspaceFolder}/LTM_HAL/examples/canfd/src"
             ],
             "defines": [
                 "_RENESAS_RA_",
@@ -71,9 +74,11 @@
                 "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/config/CMSIS/Device/ST/STM32G4xx/Include",
                 "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/config/STM32G4xx_HAL_Driver/Inc",
                 "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/config/STM32G4xx_HAL_Driver/Inc/Legacy",
-                "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/examples/basic/src",
-                "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/examples/basic/lib",
-                "${workspaceFolder}/boards/stm32g474"
+                "${workspaceFolder}/LTM_HAL/examples/basic/src",
+                "${workspaceFolder}/LTM_HAL/ltm_hal_stm32g474_rbt3/bin",
+                "${workspaceFolder}/boards/stm32g474",
+                "${workspaceFolder}/components",
+                "${workspaceFolder}/LTM_HAL/examples/canfd/src"
             ],
             "defines": [
                 "STM32G474xx",
