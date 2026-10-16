@@ -9,6 +9,10 @@ __pycache__/
 *.map
 *.exe
 
+# e2studio / FSP 工程自带的 IDE 配置（平台包 config/ 下，不属于源码）
+.settings/
+LTM_HAL/*/config/**/.vscode/
+
 # editor temp files
 *.swp
 *.bak

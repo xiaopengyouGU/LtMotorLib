@@ -2,19 +2,19 @@
 # 统一 BootLoader SDK - 双通道（CAN-FD+ISO-TP / UART+LTM）
 # 分层：core（硬件无关）/ port（自包含精简外设驱动）/ app（配置+入口）/ bsp（精简 FSP 支持）
 # BootLoader 自身代码不依赖 LTM_HAL（不链接 libLTM_HAL.a、不调用 ltm_* API），
-# LTM 协议组件（ltm_commut/protocol）以源码形式随 core 携带；
+# LTM 协议组件（ltm_commut/protocol）直接编译仓库根 components/protocol（唯一源）；
 # FSP 芯片驱动源码从该板的 HAL 包（LTM_HAL_SDK_DIR）引用。
 # 板级映射（工具链 / HAL 包 / 运行区链接脚本 / MCU 定义）：boards/<board>/board.cmake
-# 构建：python script.py -b（或 cmake -G "MinGW Makefiles" -B build -DLTM_FOC_BOARD=ra8t2 -DCMAKE_BUILD_TYPE=Release .）
+# 构建：python script.py -b（或 cmake -G "MinGW Makefiles" -B build -DLTM_BOARD=ra8t2 -DCMAKE_BUILD_TYPE=Release .）
 #===========================================================
 cmake_minimum_required(VERSION 3.20)
 
 # 板级映射（与 LTM_FOC / LTM_HAL 例程同一套）
 get_filename_component(LTM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-if(NOT LTM_FOC_BOARD)
-    set(LTM_FOC_BOARD "ra8t2")
+if(NOT LTM_BOARD)
+    set(LTM_BOARD "ra8t2")
 endif()
-include(${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake)
+include(${LTM_ROOT}/boards/${LTM_BOARD}/board.cmake)
 get_filename_component(LTM_BOARD_LINKER_DIR      "${LTM_BOARD_LINKER}"      DIRECTORY)
 get_filename_component(LTM_BOARD_BOOT_LINKER_DIR "${LTM_BOARD_BOOT_LINKER}" DIRECTORY)
 
@@ -35,7 +35,7 @@ add_compile_definitions(${LTM_BOARD_DEFINES})
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/core
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/protocol
+    ${LTM_ROOT}/components
     ${CMAKE_CURRENT_SOURCE_DIR}/port
     ${CMAKE_CURRENT_SOURCE_DIR}/app
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp
@@ -53,7 +53,7 @@ include_directories(
 # ========== BootLoader 自身源码 ==========
 file(GLOB BL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/core/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/protocol/*.c
+    ${LTM_ROOT}/components/protocol/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/port/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/app/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/bsp/*.c

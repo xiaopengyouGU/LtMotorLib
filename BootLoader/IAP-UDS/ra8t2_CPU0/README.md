@@ -24,7 +24,7 @@ ra8t2_CPU0/
 │   ├── bootloader.c/h      # 状态机 + 元数据 + 运行区/备份区回滚（传输无关）
 │   ├── uds_server.c/h      # UDS 兼容升级服务：会话/解锁/下载/CRC —— 唯一一份
 │   ├── iso15765.c/h        # CAN-FD 通道：ISO-TP
-│   └── protocol/           # UART 通道：LTM 协议（ltm_commut/protocol）
+│   └── （UART 通道的 LTM 协议直接用仓库根 components/protocol，唯一一份源）
 ├── port/
 │   ├── port_canfd.c/h      # CAN-FD 驱动（UDS 通道）
 │   ├── port_uart.c/h       # UART 驱动（IAP 通道，FIFO 批量接收）
@@ -132,8 +132,8 @@ bl_commit_app();        /* App 启动成功后确认新固件有效 */
 > 链接未加 `-u _printf_float`：BootLoader 不调用 `ltm_commut_printf`，省掉浮点格式化支持（数 KB）。
 > 若以后 BootLoader 需要 `%f` 文本输出，在 `CMakeLists.txt` 链接选项恢复该行即可。
 
-> `core/protocol/protocol.c` 裁剪了调试 `printf`（`flag` 恒为 0，永不执行），
-> 连带把 printf/vsnprintf 整套 stdio 机制从固件中移除，再省数 KB；帧格式与 LTM_HAL 字节级一致。
+> LTM 协议组件直接用仓库根 `components/protocol/`（与 LTM_HAL、例程同一份源）：
+> 调试 `printf` 已裁掉，`printf` 换成轻量 `ltm_vfmt`，整套 stdio 不进固件；帧格式与 LTM_HAL 字节级一致。
 
 ## 八、内存占用
 
