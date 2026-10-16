@@ -138,8 +138,13 @@ void lt_foc_update(int32_t Vd, int32_t Vq, uint32_t the, int32_t dutys[3])
     int64_t mag2 = (int64_t)Vd * Vd + (int64_t)Vq * Vq;
     if (mag2 > (int64_t)FOC_Q15_ONE_I32 * FOC_Q15_ONE_I32) {
         uint32_t m = lt_sqrt_u32((uint32_t)mag2);
-        Vd = (int32_t)(((int64_t)Vd * FOC_Q15_ONE_I32) / (int32_t)m);
-        Vq = (int32_t)(((int64_t)Vq * FOC_Q15_ONE_I32) / (int32_t)m);
+        /* 两轴共用同一个除数 m，所以只算一次倒数、各轴一次乘法：
+         *   inv = 2^30 / m   （Q15 倒数；m ∈ [32768, 65534] ⇒ inv ∈ [16385, 32768]）
+         *   Vd·32768/m 与 (Vd·inv)>>15 在精确算术上等价，省掉一次 64 位除法。
+         * 钳位后 |Vd| ≤ 46340、inv ≤ 32768，乘积 < 2^31，int64 只为免去符号扩展顾虑 */
+        int32_t inv = (int32_t)(((int64_t)FOC_Q15_ONE_I32 << 15) / (int32_t)m);
+        Vd = (int32_t)(((int64_t)Vd * inv) >> 15);
+        Vq = (int32_t)(((int64_t)Vq * inv) >> 15);
     }
 
     /* 相位 = the * step >> 16：1 条 MULS + 1 条移位，无除法、无取模
