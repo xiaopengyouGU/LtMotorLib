@@ -36,7 +36,7 @@ set(ARCH_FLAGS "-mcpu=cortex-m33 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard")
 set(WARNING_FLAGS "-Wall -Wextra -Wunused -Wuninitialized -Wmissing-declarations -Wconversion -Wpointer-arith -Wshadow -Wlogical-op -Waggregate-return -Wfloat-equal")
 
 # 通用选项（节区分离、依赖生成）
-set(COMMON_FLAGS "${ARCH_FLAGS} ${WARNING_FLAGS} -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -MMD -MP")
+set(COMMON_FLAGS "${ARCH_FLAGS} ${WARNING_FLAGS} -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -MMD -MP -flto")
 
 # C 编译器默认选项
 set(CMAKE_C_FLAGS_INIT "${COMMON_FLAGS} -std=c99")

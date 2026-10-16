@@ -26,6 +26,16 @@ if(NOT EXISTS "${LTM_FOC_PARAM_H}")
 endif()
 message(STATUS "LTM_FOC 板级: ${LTM_FOC_BOARD}")
 
+# 板级映射：HAL SDK 目录 / 工具链 / 链接脚本的唯一出处。
+# FOC 库要靠它定位 HAL 头（LTM_HAL_SDK_DIR）。原来这里写死 ../../LTM_HAL/ltm_hal_ra6m4/bin：
+#   1) LTM_FOC/../.. 是仓库的上一级 -> 指到迁移前的旧目录，头文件用的是老的；
+#   2) 板名写死 ra6m4 -> 换板后仍然编译 ra6m4 的 HAL 头（满量程/编码器分辨率全错）。
+set(LTM_BOARD_CMAKE "${LTM_ROOT}/boards/${LTM_FOC_BOARD}/board.cmake")
+if(NOT EXISTS "${LTM_BOARD_CMAKE}")
+    message(FATAL_ERROR "缺少板级映射 ${LTM_BOARD_CMAKE}（需在其中定义 LTM_HAL_SDK_DIR）")
+endif()
+include("${LTM_BOARD_CMAKE}")
+
 # LTM_CTRL 以子项目方式并入：同一构建图、同一工具链，改 CTRL 源码即触发重建
 add_subdirectory(${LTM_ROOT}/LTM_CTRL ${CMAKE_BINARY_DIR}/ltm_ctrl)
 
@@ -38,7 +48,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../LTM_HAL/ltm_hal_ra6m4/bin
+    ${LTM_HAL_SDK_DIR}/bin
 )
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC LTMFOC_VERSION_STRING="${LTMFOC_VERSION}")

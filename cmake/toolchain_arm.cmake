@@ -27,17 +27,17 @@ endif()
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 # M4/M7 同一套：ARMv7E-M + 单精度硬浮点
-set(LTM_ARM_ARCH_FLAGS "-mthumb -march=armv7e-m -mfpu=fpv4-sp-d16 -mfloat-abi=hard"
+set(LTM_ARM_ARCH_FLAGS "-mcpu=cortex-m33 -mthumb -mfpu=fpv5-sp-d16 -mfloat-abi=hard"
     CACHE STRING "指令集与浮点 ABI")
 set(ARCH_FLAGS "${LTM_ARM_ARCH_FLAGS}")
 
 set(WARNING_FLAGS "-Wall -Wextra -Wunused -Wuninitialized -Wmissing-declarations -Wconversion -Wpointer-arith -Wshadow -Wlogical-op -Waggregate-return -Wfloat-equal")
-set(COMMON_FLAGS "${ARCH_FLAGS} ${WARNING_FLAGS} -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -MMD -MP")
+set(COMMON_FLAGS "${ARCH_FLAGS} ${WARNING_FLAGS} -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-sections -MMD -MP -flto")
 
 set(CMAKE_C_FLAGS_INIT   "${COMMON_FLAGS} -std=c99")
 set(CMAKE_CXX_FLAGS_INIT "${COMMON_FLAGS} -std=c++11")
 set(CMAKE_ASM_FLAGS_INIT "${ARCH_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "${ARCH_FLAGS} -Wl,--gc-sections -Wl,--print-memory-usage")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "${ARCH_FLAGS} -flto -Wl,--gc-sections -Wl,--print-memory-usage")
 
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 12.2)
     add_compile_options(
