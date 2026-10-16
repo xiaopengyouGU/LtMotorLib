@@ -7,17 +7,33 @@ on:
 
 jobs:
   build:
-    name: LTM_CI（ubuntu / arm-none-eabi）
+    name: LTM_CI（ubuntu / GNU Arm Embedded）
     runs-on: ubuntu-latest
     env:
       LTM_CMAKE_GENERATOR: Unix Makefiles
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装工具链
+      - name: 安装构建工具
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake make gcc gcc-arm-none-eabi
+          sudo apt-get install -y --no-install-recommends cmake make gcc curl
+
+      - name: 安装 ARM 工具链（xpack 版官方 GNU Arm Embedded，自带 newlib 与 nano/nosys specs）
+        run: |
+          curl -fL --retry 3 --retry-delay 2 -o /tmp/armgcc.tar.gz \
+            https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v13.3.1-1.1/xpack-arm-none-eabi-gcc-13.3.1-1.1-linux-x64.tar.gz
+          sudo mkdir -p /opt/armgcc
+          sudo tar -xf /tmp/armgcc.tar.gz -C /opt/armgcc --strip-components=1
+          echo "/opt/armgcc/bin" >> $GITHUB_PATH
+
+      - name: 工具链自检（头文件 + nano/nosys specs）
+        run: |
+          arm-none-eabi-gcc --version | head -1
+          printf '#include <string.h>\n#include <assert.h>\nint main(void){return 0;}\n' > /tmp/probe.c
+          arm-none-eabi-gcc -c /tmp/probe.c -o /tmp/probe.o
+          arm-none-eabi-gcc /tmp/probe.c -specs=nano.specs -specs=nosys.specs -o /tmp/probe.elf
+          arm-none-eabi-size /tmp/probe.elf
 
       - name: 构建 + 主机测试
         run: python3 tools/ci.py

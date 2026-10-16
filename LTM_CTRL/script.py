@@ -26,8 +26,9 @@ TOOLCHAINS = {
 }
 EXAMPLE = os.path.join(ROOT, "examples")
 EX_BUILD = os.path.join(EXAMPLE, "build")
-EX_EXE = os.path.join(EX_BUILD, "sim.exe")
-STRESS_EXE = os.path.join(EX_BUILD, "speed_stress.exe")
+EXE_SUFFIX = ".exe" if os.name == "nt" else ""      # CMake 在 Linux 上不生成后缀
+EX_EXE = os.path.join(EX_BUILD, "sim" + EXE_SUFFIX)
+STRESS_EXE = os.path.join(EX_BUILD, "speed_stress" + EXE_SUFFIX)
 
 
 def build_dir(platform):
@@ -73,7 +74,7 @@ def build_example():
 
 def run_example():
     if not os.path.isfile(EX_EXE):
-        print("[FAIL] 找不到 sim.exe，请先构建")
+        print("[FAIL] 找不到 %s，请先构建" % os.path.basename(EX_EXE))
         return False
     return run([EX_EXE], cwd=EX_BUILD)
 
@@ -87,7 +88,7 @@ def build_stress():
 
 def run_stress():
     if not os.path.isfile(STRESS_EXE):
-        print("[FAIL] 找不到 speed_stress.exe，请先构建")
+        print("[FAIL] 找不到 %s，请先构建" % os.path.basename(STRESS_EXE))
         return False
     return run([STRESS_EXE], cwd=EX_BUILD)
 

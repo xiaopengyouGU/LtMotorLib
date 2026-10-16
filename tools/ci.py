@@ -47,14 +47,14 @@ STEPS = [
 
 
 def fix_tmp():
-    """LTO 的 lto-wrapper 处理不了非 ASCII 临时路径，自动指到仓库下的纯 ASCII 目录"""
+    """TMP/TEMP 为空或含非 ASCII 字符时（LTO 的 lto-wrapper 处理不了），改用仓库下的纯 ASCII 目录"""
     tmp = os.environ.get("TMP") or os.environ.get("TEMP") or ""
     if tmp and all(ord(c) < 128 for c in tmp):
         return
     d = os.path.join(ROOT, ".ci_tmp")
     os.makedirs(d, exist_ok=True)
     os.environ["TMP"] = os.environ["TEMP"] = d
-    print("[warn] TMP/TEMP 非 ASCII（%s），改用 %s" % (tmp, d))
+    print("[warn] TMP/TEMP 为空或非 ASCII（%s），改用 %s" % (tmp, d))
 
 
 def step_path(rel):
